@@ -34,8 +34,8 @@ class AudiobookReaderGUI(ttk.Window):
         style.configure('TButton', background='#FFD700', foreground='#000000', font=("Monaco", 13),
                        borderwidth=0, relief='flat', focuscolor='none')
         style.map('TButton',
-                 background=[('active', '#FFFFFF'), ('!active', '#FFD700')],
-                 foreground=[('active', '#000000'), ('!active', '#000000')])
+                 background=[('disabled', '#555555'), ('active', '#FFFFFF'), ('!active', '#FFD700')],
+                 foreground=[('disabled', '#888888'), ('active', '#000000'), ('!active', '#000000')])
 
         # Convert button - large with hover
         style.configure('Convert.TButton',
@@ -244,9 +244,9 @@ class AudiobookReaderGUI(ttk.Window):
         )
         self.char_config_btn.pack(side=tk.LEFT)
 
-        # Progress display (shorter - half height)
+        # Progress display - let it expand with window
         progress_frame = ttk.LabelFrame(self, text="Progress", padding=13)
-        progress_frame.pack(fill=tk.X, padx=21, pady=13)
+        progress_frame.pack(fill=tk.BOTH, expand=True, padx=21, pady=13)
 
         # Monospace text widget with scrollbar
         text_container = ttk.Frame(progress_frame)
@@ -261,10 +261,9 @@ class AudiobookReaderGUI(ttk.Window):
             bg="#000000",
             fg="#FFD700",
             wrap=tk.WORD,
-            height=8,
             yscrollcommand=scrollbar.set
         )
-        self.progress_text.pack(side=tk.LEFT, fill=tk.BOTH)
+        self.progress_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.progress_text.yview)
 
         # Placeholder text
@@ -496,12 +495,19 @@ class AudiobookReaderGUI(ttk.Window):
     def _center_window(self):
         """Center window on screen."""
         self.update_idletasks()
-        width = 800
-        height = 800
+        width = 900
+        height = 1000
+        screen_height = self.winfo_screenheight()
+
+        # Don't make window taller than 90% of screen
+        max_height = int(screen_height * 0.9)
+        if height > max_height:
+            height = max_height
+
         x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
+        y = (screen_height // 2) - (height // 2)
         self.geometry(f'{width}x{height}+{x}+{y}')
-        self.minsize(700, 700)
+        self.minsize(700, 800)
 
     def _load_last_directory(self):
         """Load last used directory from config."""
