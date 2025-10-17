@@ -69,20 +69,23 @@ class ConversionThread(threading.Thread):
 
     def run(self):
         """Run conversion in background."""
-        try:
-            # Redirect stdout to capture progress in real-time
-            old_stdout = sys.stdout
-            sys.stdout = RealtimeStdoutCapture(self.callback)
+        import os
+        old_stdout = sys.stdout
+        original_dir = os.getcwd()
 
-            # Build reader options (save output_dir for later use)
+        try:
+            # Setup output directory
             output_dir = Path(self.options.get('output_dir', Path.home() / "Downloads"))
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Convert file path to absolute before changing directory
-            import os
+            # Convert to absolute path before chdir
             absolute_file_path = os.path.abspath(self.file_path)
-            original_dir = os.getcwd()
+
+            # Change to output directory so reader creates temp files there
             os.chdir(output_dir)
+
+            # Redirect stdout to capture progress in real-time
+            sys.stdout = RealtimeStdoutCapture(self.callback)
 
             convert_kwargs = {
                 'file_path': absolute_file_path,
@@ -102,13 +105,12 @@ class ConversionThread(threading.Thread):
             # Set progress style (none works best with GUI)
             progress_style = self.options.get('progress_style', 'none')
             if progress_style != 'none':
-                # Note: timeseries doesn't work well with stdout capture
                 convert_kwargs['progress_style'] = 'simple'
 
-            # Run conversion
+            # Run conversion (outputs to current directory = output_dir)
             output_path = self.reader.convert(**convert_kwargs)
 
-            # Restore original directory
+            # Restore directory
             os.chdir(original_dir)
 
             # Get captured output

@@ -119,7 +119,6 @@ class AudiobookReaderGUI(ttk.Window):
         # State
         self.output_path = None
         self.progress_queue = queue.Queue()
-        self.viz_window = None
         self._load_last_directory()
 
         self.setup_ui()
@@ -128,27 +127,31 @@ class AudiobookReaderGUI(ttk.Window):
 
     def setup_ui(self):
         """Build the interface."""
-        # File selection
-        file_frame = ttk.LabelFrame(self, text="Input File", padding=13)
-        file_frame.pack(fill=tk.X, padx=21, pady=(21, 13))
+        # Main scrollable container
+        main_container = ttk.Frame(self)
+        main_container.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Entry(file_frame, textvariable=self.file_path).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 13))
+        # File selection
+        file_frame = ttk.LabelFrame(main_container, text="Input File", padding=8)
+        file_frame.pack(fill=tk.X, padx=21, pady=(13, 5))
+
+        ttk.Entry(file_frame, textvariable=self.file_path).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
         ttk.Button(file_frame, text="Browse...", command=self.browse_file).pack(side=tk.LEFT)
 
         # Output directory
-        output_frame = ttk.LabelFrame(self, text="Output Directory", padding=13)
-        output_frame.pack(fill=tk.X, padx=21, pady=(0, 13))
+        output_frame = ttk.LabelFrame(main_container, text="Output Directory", padding=8)
+        output_frame.pack(fill=tk.X, padx=21, pady=5)
 
-        ttk.Entry(output_frame, textvariable=self.output_dir).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 13))
-        ttk.Button(output_frame, text="Browse...", command=self.browse_output_dir).pack(side=tk.LEFT, padx=(0, 13))
+        ttk.Entry(output_frame, textvariable=self.output_dir).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
+        ttk.Button(output_frame, text="Browse...", command=self.browse_output_dir).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(output_frame, text="Open", command=self.open_output_folder).pack(side=tk.LEFT)
 
         # Voice and speed controls
-        controls_frame = ttk.Frame(self)
-        controls_frame.pack(fill=tk.X, padx=21, pady=13)
+        controls_frame = ttk.Frame(main_container)
+        controls_frame.pack(fill=tk.X, padx=21, pady=5)
 
         # Voice selection
-        voice_frame = ttk.LabelFrame(controls_frame, text="Voice", padding=13)
+        voice_frame = ttk.LabelFrame(controls_frame, text="Voice", padding=8)
         voice_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
         voices = self._get_voice_list()
@@ -156,7 +159,7 @@ class AudiobookReaderGUI(ttk.Window):
         voice_combo.pack(fill=tk.X)
 
         # Speed control
-        speed_frame = ttk.LabelFrame(controls_frame, text="Speed", padding=13)
+        speed_frame = ttk.LabelFrame(controls_frame, text="Speed", padding=8)
         speed_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
         speed_container = ttk.Frame(speed_frame)
@@ -173,14 +176,14 @@ class AudiobookReaderGUI(ttk.Window):
             command=self.update_speed_label,
             orient=tk.HORIZONTAL
         )
-        speed_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 13))
+        speed_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
 
         # Format and visualization
-        options_frame = ttk.Frame(self)
-        options_frame.pack(fill=tk.X, padx=21, pady=13)
+        options_frame = ttk.Frame(main_container)
+        options_frame.pack(fill=tk.X, padx=21, pady=5)
 
         # Output format
-        format_frame = ttk.LabelFrame(options_frame, text="Output Format", padding=13)
+        format_frame = ttk.LabelFrame(options_frame, text="Format", padding=8)
         format_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
         formats = ["mp3", "wav", "m4a", "m4b"]
@@ -190,25 +193,25 @@ class AudiobookReaderGUI(ttk.Window):
                 text=fmt.upper(),
                 variable=self.output_format,
                 value=fmt
-            ).pack(side=tk.LEFT, padx=13)
+            ).pack(side=tk.LEFT, padx=8)
 
         # Visualization options
-        viz_frame = ttk.LabelFrame(options_frame, text="Options", padding=13)
+        viz_frame = ttk.LabelFrame(options_frame, text="Options", padding=8)
         viz_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
         ttk.Checkbutton(
             viz_frame,
             text="Show Visualization",
             variable=self.show_visualization
-        ).pack(anchor=tk.W, padx=13, pady=5)
+        ).pack(anchor=tk.W, padx=8, pady=3)
 
         # Character voices
-        char_frame = ttk.LabelFrame(self, text="Character Voices", padding=13)
-        char_frame.pack(fill=tk.X, padx=21, pady=13)
+        char_frame = ttk.LabelFrame(main_container, text="Character Voices", padding=8)
+        char_frame.pack(fill=tk.X, padx=21, pady=5)
 
         # Enable checkbox and auto-assign button
         top_row = ttk.Frame(char_frame)
-        top_row.pack(fill=tk.X, pady=(0, 8))
+        top_row.pack(fill=tk.X, pady=(0, 5))
 
         ttk.Checkbutton(
             top_row,
@@ -221,20 +224,20 @@ class AudiobookReaderGUI(ttk.Window):
             top_row,
             text="Auto-assign Voices",
             variable=self.auto_assign_voices
-        ).pack(side=tk.LEFT, padx=(21, 0))
+        ).pack(side=tk.LEFT, padx=(13, 0))
 
         # Config file selector
         char_config_container = ttk.Frame(char_frame)
         char_config_container.pack(fill=tk.X)
 
-        ttk.Label(char_config_container, text="Config File:").pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Label(char_config_container, text="Config:").pack(side=tk.LEFT, padx=(0, 8))
 
         self.char_config_entry = ttk.Entry(
             char_config_container,
             textvariable=self.character_config_path,
             state="disabled"
         )
-        self.char_config_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 13))
+        self.char_config_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
 
         self.char_config_btn = ttk.Button(
             char_config_container,
@@ -244,9 +247,26 @@ class AudiobookReaderGUI(ttk.Window):
         )
         self.char_config_btn.pack(side=tk.LEFT)
 
-        # Progress display - fixed height
-        progress_frame = ttk.LabelFrame(self, text="Progress", padding=13)
-        progress_frame.pack(fill=tk.X, padx=21, pady=13)
+        # Progress display - fixed height to keep Read button visible
+        progress_frame = ttk.LabelFrame(main_container, text="Progress", padding=8)
+        progress_frame.pack(fill=tk.X, padx=21, pady=5)
+
+        # Visualization canvas (hidden by default)
+        self.viz_container = ttk.Frame(progress_frame)
+        self.viz_canvas = None
+        self.viz_fig = None
+        self.viz_ax = None
+        self.viz_line = None
+        self.time_history = None
+        self.speed_history = None
+
+        # Stats labels
+        stats_frame = ttk.Frame(progress_frame)
+        stats_frame.pack(fill=tk.X, pady=(0, 5))
+
+        self.progress_label = ttk.Label(stats_frame, text="")
+        self.speed_label = ttk.Label(stats_frame, text="")
+        self.eta_label = ttk.Label(stats_frame, text="")
 
         # Monospace text widget with scrollbar
         text_container = ttk.Frame(progress_frame)
@@ -271,16 +291,16 @@ class AudiobookReaderGUI(ttk.Window):
         self.progress_text.insert("1.0", "Ready to read. Select a file and click Read.\n")
         self.progress_text.config(state="disabled")
 
-        # Big yellow Convert button - centered
-        convert_frame = ttk.Frame(self)
-        convert_frame.pack(pady=21)
+        # Big yellow Read button - centered, always visible
+        convert_frame = ttk.Frame(main_container)
+        convert_frame.pack(side=tk.BOTTOM, pady=13)
 
         self.convert_btn = ttk.Button(
             convert_frame,
             text="Read",
             command=self.start_conversion,
             style='Convert.TButton',
-            width=21
+            width=13
         )
         self.convert_btn.pack()
 
@@ -387,13 +407,9 @@ class AudiobookReaderGUI(ttk.Window):
         self.progress_text.config(state="disabled")
         self.convert_btn.config(state="disabled", text="Reading...")
 
-        # Open visualization window if enabled
+        # Setup visualization if enabled
         if self.show_visualization.get():
-            try:
-                from .visualization import VisualizationWindow
-            except ImportError:
-                from visualization import VisualizationWindow
-            self.viz_window = VisualizationWindow(self)
+            self._setup_visualization()
 
         # Start thread
         try:
@@ -426,9 +442,9 @@ class AudiobookReaderGUI(ttk.Window):
                     self.progress_text.config(state="disabled")
 
                 elif event_type == 'realtime_progress':
-                    # Update visualization window
-                    if self.viz_window and self.viz_window.winfo_exists():
-                        self.viz_window.update_progress(
+                    # Update embedded visualization
+                    if self.viz_canvas:
+                        self._update_visualization(
                             data['chunk'],
                             data['total'],
                             data['speed'],
@@ -439,16 +455,12 @@ class AudiobookReaderGUI(ttk.Window):
                 elif event_type == 'complete':
                     self.output_path = data
                     self.convert_btn.config(state="normal", text="Read")
-                    if self.viz_window and self.viz_window.winfo_exists():
-                        self.viz_window.destroy()
-                        self.viz_window = None
+                    self._cleanup_visualization()
                     messagebox.showinfo("Success", f"Conversion complete!\n\nOutput: {data}")
 
                 elif event_type == 'error':
                     self.convert_btn.config(state="normal", text="Read")
-                    if self.viz_window and self.viz_window.winfo_exists():
-                        self.viz_window.destroy()
-                        self.viz_window = None
+                    self._cleanup_visualization()
                     messagebox.showerror("Error", f"Conversion failed:\n\n{data}")
 
         except queue.Empty:
@@ -494,21 +506,31 @@ class AudiobookReaderGUI(ttk.Window):
 
 
     def _center_window(self):
-        """Center window on screen."""
+        """Center window on screen, size based on content."""
         self.update_idletasks()
-        width = 900
-        height = 750
+
+        # Let content determine height, set reasonable width
+        width = 610
+
+        # Get actual required height from packed widgets
+        required_height = self.winfo_reqheight()
+
+        screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
 
-        # Don't make window taller than 85% of screen
+        # Don't exceed 85% of screen
+        max_width = int(screen_width * 0.85)
         max_height = int(screen_height * 0.85)
-        if height > max_height:
-            height = max_height
 
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        height = min(required_height + 50, max_height)
+        if width > max_width:
+            width = max_width
+
+        x = (screen_width // 2) - (width // 2)
         y = (screen_height // 2) - (height // 2)
         self.geometry(f'{width}x{height}+{x}+{y}')
-        self.minsize(800, 650)
+
+        self.minsize(377, 610)
 
     def _load_last_directory(self):
         """Load last used directory from config."""
@@ -528,6 +550,102 @@ class AudiobookReaderGUI(ttk.Window):
             config_file.write_text(self.output_dir.get())
         except Exception:
             pass
+
+    def _setup_visualization(self):
+        """Setup embedded matplotlib visualization."""
+        from collections import deque
+        import matplotlib
+        matplotlib.use('TkAgg')
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+        # Hide progress text when showing visualization
+        self.progress_text.master.pack_forget()
+
+        # Initialize data
+        self.time_history = deque(maxlen=50)
+        self.speed_history = deque(maxlen=50)
+        self.time_history.append(0)
+        self.speed_history.append(0)
+
+        # Show stats labels
+        self.progress_label.pack(side=tk.LEFT, padx=(0, 13))
+        self.speed_label.pack(side=tk.LEFT, padx=(0, 13))
+        self.eta_label.pack(side=tk.LEFT)
+
+        # Create figure
+        self.viz_fig = Figure(figsize=(5, 3), facecolor='#000000')
+        self.viz_ax = self.viz_fig.add_subplot(111, facecolor='#000000')
+
+        # Style
+        self.viz_ax.set_xlabel('Time (min)', color='#FFD700', fontsize=10)
+        self.viz_ax.set_ylabel('Speed (chunks/min)', color='#FFD700', fontsize=10)
+        self.viz_ax.tick_params(colors='#FFD700', labelsize=9)
+        self.viz_ax.grid(True, alpha=0.2, color='#555555')
+        self.viz_ax.spines['bottom'].set_color('#FFD700')
+        self.viz_ax.spines['left'].set_color('#FFD700')
+        self.viz_ax.spines['top'].set_visible(False)
+        self.viz_ax.spines['right'].set_visible(False)
+
+        # Plot
+        self.viz_line, = self.viz_ax.plot(
+            list(self.time_history),
+            list(self.speed_history),
+            color='#FFD700',
+            linewidth=2
+        )
+        self.viz_ax.set_xlim(0, 1)
+        self.viz_ax.set_ylim(0, 10)
+
+        # Embed in container
+        self.viz_container.pack(fill=tk.X, pady=(0, 8))
+        self.viz_canvas = FigureCanvasTkAgg(self.viz_fig, master=self.viz_container)
+        self.viz_canvas.draw()
+        self.viz_canvas.get_tk_widget().pack(fill=tk.X)
+
+    def _update_visualization(self, chunk, total, speed, elapsed, eta):
+        """Update embedded visualization."""
+        if not self.viz_canvas:
+            return
+
+        # Update stats
+        progress_pct = (chunk / total) * 100 if total > 0 else 0
+        self.progress_label.config(text=f"Progress: {progress_pct:.1f}%")
+        self.speed_label.config(text=f"Speed: {speed:.1f} chunks/min")
+        eta_mins = int(eta // 60)
+        eta_secs = int(eta % 60)
+        self.eta_label.config(text=f"ETA: {eta_mins}m {eta_secs}s")
+
+        # Update data
+        time_mins = elapsed / 60
+        self.time_history.append(time_mins)
+        self.speed_history.append(speed)
+
+        # Update plot
+        self.viz_line.set_data(list(self.time_history), list(self.speed_history))
+
+        # Auto-scale
+        if len(self.time_history) > 1:
+            max_time = max(self.time_history)
+            max_speed = max(self.speed_history) if max(self.speed_history) > 0 else 10
+            self.viz_ax.set_xlim(0, max(1, max_time * 1.1))
+            self.viz_ax.set_ylim(0, max(10, max_speed * 1.2))
+
+        self.viz_canvas.draw()
+
+    def _cleanup_visualization(self):
+        """Remove visualization after completion."""
+        if self.viz_canvas:
+            self.viz_container.pack_forget()
+            self.viz_canvas = None
+            self.viz_fig = None
+            self.viz_ax = None
+            self.viz_line = None
+            self.progress_label.pack_forget()
+            self.speed_label.pack_forget()
+            self.eta_label.pack_forget()
+            # Show progress text again
+            self.progress_text.master.pack(fill=tk.X)
 
 
 def main():
