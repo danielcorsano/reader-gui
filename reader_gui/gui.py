@@ -59,7 +59,7 @@ class AudiobookReaderGUI(ttk.Window):
 
         # Variables
         self.file_path = tk.StringVar()
-        self.voice = tk.StringVar(value="af_sarah")
+        self.voice = tk.StringVar(value="am_michael")
         self.speed = tk.DoubleVar(value=1.0)
         self.output_format = tk.StringVar(value="mp3")
         self.character_voices_enabled = tk.BooleanVar(value=False)
@@ -183,13 +183,13 @@ class AudiobookReaderGUI(ttk.Window):
         )
         self.char_config_btn.pack(side=tk.LEFT)
 
-        # Progress display
+        # Progress display (shorter - half height)
         progress_frame = ttk.LabelFrame(self, text="Progress", padding=13)
-        progress_frame.pack(fill=tk.BOTH, expand=True, padx=21, pady=13)
+        progress_frame.pack(fill=tk.X, padx=21, pady=13)
 
         # Monospace text widget with scrollbar
         text_container = ttk.Frame(progress_frame)
-        text_container.pack(fill=tk.BOTH, expand=True)
+        text_container.pack(fill=tk.BOTH)
 
         scrollbar = ttk.Scrollbar(text_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -200,24 +200,28 @@ class AudiobookReaderGUI(ttk.Window):
             bg="#000000",
             fg="#FFD700",
             wrap=tk.WORD,
+            height=15,
             yscrollcommand=scrollbar.set
         )
-        self.progress_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.progress_text.pack(side=tk.LEFT, fill=tk.BOTH)
         scrollbar.config(command=self.progress_text.yview)
 
         # Placeholder text
         self.progress_text.insert("1.0", "Ready to convert. Select a file and click Convert.\n")
         self.progress_text.config(state="disabled")
 
-        # Big convert button
+        # Big yellow Convert button - centered
+        convert_frame = ttk.Frame(self)
+        convert_frame.pack(pady=21)
+
         self.convert_btn = ttk.Button(
-            self,
+            convert_frame,
             text="Convert",
             command=self.start_conversion,
             style='Convert.TButton',
             width=21
         )
-        self.convert_btn.pack(pady=21)
+        self.convert_btn.pack()
 
         # Secondary action buttons
         button_frame = ttk.Frame(self)
