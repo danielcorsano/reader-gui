@@ -78,13 +78,14 @@ class ConversionThread(threading.Thread):
             output_dir = Path(self.options.get('output_dir', Path.home() / "Downloads"))
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Change to output directory before conversion
+            # Convert file path to absolute before changing directory
             import os
+            absolute_file_path = os.path.abspath(self.file_path)
             original_dir = os.getcwd()
             os.chdir(output_dir)
 
             convert_kwargs = {
-                'file_path': str(self.file_path),
+                'file_path': absolute_file_path,
                 'voice': self.options['voice'],
                 'speed': self.options['speed'],
                 'output_format': self.options['output_format']
