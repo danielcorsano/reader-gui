@@ -114,10 +114,12 @@ class AudiobookReaderGUI(ttk.Window):
         self.character_config_path = tk.StringVar()
         self.auto_assign_voices = tk.BooleanVar(value=False)
         self.progress_style = tk.StringVar(value="none")
+        self.show_visualization = tk.BooleanVar(value=True)
 
         # State
         self.output_path = None
         self.progress_queue = queue.Queue()
+        self.viz_window = None
         self._load_last_directory()
 
         self.setup_ui()
@@ -138,7 +140,8 @@ class AudiobookReaderGUI(ttk.Window):
         output_frame.pack(fill=tk.X, padx=21, pady=(0, 13))
 
         ttk.Entry(output_frame, textvariable=self.output_dir).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 13))
-        ttk.Button(output_frame, text="Browse...", command=self.browse_output_dir).pack(side=tk.LEFT)
+        ttk.Button(output_frame, text="Browse...", command=self.browse_output_dir).pack(side=tk.LEFT, padx=(0, 13))
+        ttk.Button(output_frame, text="Open", command=self.open_output_folder).pack(side=tk.LEFT)
 
         # Voice and speed controls
         controls_frame = ttk.Frame(self)
@@ -189,18 +192,15 @@ class AudiobookReaderGUI(ttk.Window):
                 value=fmt
             ).pack(side=tk.LEFT, padx=13)
 
-        # Visualization style
-        viz_frame = ttk.LabelFrame(options_frame, text="Progress Visualization", padding=13)
+        # Visualization options
+        viz_frame = ttk.LabelFrame(options_frame, text="Options", padding=13)
         viz_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
-        viz_styles = ["timeseries", "simple", "none"]
-        for style in viz_styles:
-            ttk.Radiobutton(
-                viz_frame,
-                text=style.capitalize(),
-                variable=self.progress_style,
-                value=style
-            ).pack(side=tk.LEFT, padx=13)
+        ttk.Checkbutton(
+            viz_frame,
+            text="Show Visualization",
+            variable=self.show_visualization
+        ).pack(anchor=tk.W, padx=13, pady=5)
 
         # Character voices
         char_frame = ttk.LabelFrame(self, text="Character Voices", padding=13)
@@ -261,7 +261,7 @@ class AudiobookReaderGUI(ttk.Window):
             bg="#000000",
             fg="#FFD700",
             wrap=tk.WORD,
-            height=15,
+            height=8,
             yscrollcommand=scrollbar.set
         )
         self.progress_text.pack(side=tk.LEFT, fill=tk.BOTH)
@@ -284,23 +284,6 @@ class AudiobookReaderGUI(ttk.Window):
         )
         self.convert_btn.pack()
 
-        # Secondary action buttons
-        button_frame = ttk.Frame(self)
-        button_frame.pack(fill=tk.X, padx=21, pady=(0, 21))
-
-        self.preview_btn = ttk.Button(
-            button_frame,
-            text="Preview",
-            command=self.preview_audio,
-            state="disabled"
-        )
-        self.preview_btn.pack(side=tk.LEFT, padx=(0, 13))
-
-        ttk.Button(
-            button_frame,
-            text="Open Output Folder",
-            command=self.open_output_folder
-        ).pack(side=tk.LEFT)
 
     def _get_voice_list(self):
         """Get available voices."""
@@ -404,6 +387,14 @@ class AudiobookReaderGUI(ttk.Window):
         self.progress_text.config(state="disabled")
         self.convert_btn.config(state="disabled", text="Reading...")
 
+        # Open visualization window if enabled
+        if self.show_visualization.get():
+            try:
+                from .visualization import VisualizationWindow
+            except ImportError:
+                from visualization import VisualizationWindow
+            self.viz_window = VisualizationWindow(self)
+
         # Start thread
         try:
             from .threads import ConversionThread
@@ -434,14 +425,30 @@ class AudiobookReaderGUI(ttk.Window):
                     self.progress_text.see("end")
                     self.progress_text.config(state="disabled")
 
+                elif event_type == 'realtime_progress':
+                    # Update visualization window
+                    if self.viz_window and self.viz_window.winfo_exists():
+                        self.viz_window.update_progress(
+                            data['chunk'],
+                            data['total'],
+                            data['speed'],
+                            data['elapsed'],
+                            data['eta']
+                        )
+
                 elif event_type == 'complete':
                     self.output_path = data
                     self.convert_btn.config(state="normal", text="Read")
-                    self.preview_btn.config(state="normal")
+                    if self.viz_window and self.viz_window.winfo_exists():
+                        self.viz_window.destroy()
+                        self.viz_window = None
                     messagebox.showinfo("Success", f"Conversion complete!\n\nOutput: {data}")
 
                 elif event_type == 'error':
                     self.convert_btn.config(state="normal", text="Read")
+                    if self.viz_window and self.viz_window.winfo_exists():
+                        self.viz_window.destroy()
+                        self.viz_window = None
                     messagebox.showerror("Error", f"Conversion failed:\n\n{data}")
 
         except queue.Empty:
@@ -490,11 +497,11 @@ class AudiobookReaderGUI(ttk.Window):
         """Center window on screen."""
         self.update_idletasks()
         width = 800
-        height = 900
+        height = 800
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f'{width}x{height}+{x}+{y}')
-        self.minsize(700, 800)
+        self.minsize(700, 700)
 
     def _load_last_directory(self):
         """Load last used directory from config."""
