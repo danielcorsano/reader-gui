@@ -85,6 +85,13 @@ CLAUDE.md
 plan/
 .audiobook-reader-gui.conf
 
+# Test artifacts (should be in ../reader, not here)
+audio/
+text/
+models/
+config/
+finished/
+
 # Temporary files
 *.tmp
 *.temp
