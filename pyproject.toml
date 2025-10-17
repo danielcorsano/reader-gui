@@ -5,18 +5,20 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 name = "audiobook-reader-gui"
 version = "0.1.0"
-description = "Desktop GUI application for audiobook-reader converter with Monaco monospace typography and minimalist black/yellow design"
+description = "Desktop GUI for audiobook-reader with Monaco font and black/yellow design"
 authors = ["danielcorsano"]
 readme = "README.md"
 license = "MIT"
 homepage = "https://github.com/danielcorsano/reader-gui"
 repository = "https://github.com/danielcorsano/reader-gui"
 keywords = ["audiobook", "gui", "desktop", "text-to-speech", "tts", "kokoro"]
+packages = [{include = "reader_gui"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.14"
 audiobook-reader = { path = "../reader", develop = true }
 ttkbootstrap = "^1.10.1"
+plotext = "^5.3.2"
 
 [tool.poetry.group.build]
 optional = true

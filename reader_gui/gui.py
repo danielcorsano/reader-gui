@@ -1,9 +1,13 @@
 """Main GUI application for audiobook-reader."""
 
+import sys
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import ttkbootstrap as ttk
 from pathlib import Path
+import queue
+import platform
+import subprocess
 
 
 class AudiobookReaderGUI(ttk.Window):
@@ -26,8 +30,12 @@ class AudiobookReaderGUI(ttk.Window):
         style.configure('TLabelframe', background='#000000', foreground='#FFD700', font=("Monaco", 13), bordercolor='#FFD700')
         style.configure('TLabelframe.Label', background='#000000', foreground='#FFD700', font=("Monaco", 13, "bold"))
 
-        # Buttons
-        style.configure('TButton', background='#FFD700', foreground='#000000', font=("Monaco", 13), borderwidth=0, relief='flat')
+        # Buttons - yellow with white hover
+        style.configure('TButton', background='#FFD700', foreground='#000000', font=("Monaco", 13),
+                       borderwidth=0, relief='flat', focuscolor='none')
+        style.map('TButton',
+                 background=[('active', '#FFFFFF'), ('!active', '#FFD700')],
+                 foreground=[('active', '#000000'), ('!active', '#000000')])
 
         # Convert button - large with hover
         style.configure('Convert.TButton',
@@ -35,49 +43,102 @@ class AudiobookReaderGUI(ttk.Window):
                        background="#FFD700",
                        foreground="#000000",
                        borderwidth=0,
-                       relief='flat')
+                       relief='flat',
+                       focuscolor='none')
         style.map('Convert.TButton',
                  background=[('active', '#FFFFFF'), ('!active', '#FFD700')],
                  foreground=[('active', '#000000'), ('!active', '#000000')])
 
-        # Checkbuttons
-        style.configure('TCheckbutton', background='#000000', foreground='#FFD700', font=("Monaco", 13))
+        # Checkbuttons - yellow/white, no blue
+        style.configure('TCheckbutton', background='#000000', foreground='#FFD700', font=("Monaco", 13),
+                       focuscolor='#000000', borderwidth=0)
+        style.map('TCheckbutton',
+                 background=[('active', '#000000'), ('selected', '#000000')],
+                 foreground=[('active', '#FFFFFF'), ('selected', '#FFFFFF'), ('!selected', '#FFD700')])
 
-        # Radiobuttons
-        style.configure('TRadiobutton', background='#000000', foreground='#FFD700', font=("Monaco", 13))
+        # Radiobuttons - yellow/white, no blue
+        style.configure('TRadiobutton', background='#000000', foreground='#FFD700', font=("Monaco", 13),
+                       focuscolor='#000000', borderwidth=0, indicatorcolor='#FFD700')
+        style.map('TRadiobutton',
+                 background=[('active', '#000000'), ('selected', '#000000')],
+                 foreground=[('active', '#FFFFFF'), ('selected', '#FFFFFF'), ('!selected', '#FFD700')],
+                 indicatorcolor=[('selected', '#FFFFFF'), ('!selected', '#FFD700')])
 
-        # Entry fields
+        # Entry fields - no blue focus
         style.configure('TEntry', background='#000000', foreground='#FFD700', fieldbackground='#000000',
-                       font=("Monaco", 13), insertcolor='#FFD700')
+                       font=("Monaco", 13), insertcolor='#FFD700', bordercolor='#FFD700',
+                       focuscolor='#FFD700', lightcolor='#FFD700', darkcolor='#FFD700')
+        style.map('TEntry',
+                 fieldbackground=[('focus', '#000000')],
+                 foreground=[('focus', '#FFD700')],
+                 bordercolor=[('focus', '#FFD700')])
 
-        # Combobox
+        # Combobox - no blue
         style.configure('TCombobox', background='#000000', foreground='#FFD700', fieldbackground='#000000',
-                       font=("Monaco", 13))
+                       font=("Monaco", 13), bordercolor='#FFD700', arrowcolor='#FFD700',
+                       focuscolor='#000000', selectbackground='#FFD700', selectforeground='#000000')
+        style.map('TCombobox',
+                 fieldbackground=[('focus', '#000000'), ('readonly', '#000000')],
+                 foreground=[('focus', '#FFD700'), ('readonly', '#FFD700')],
+                 bordercolor=[('focus', '#FFD700'), ('readonly', '#FFD700')],
+                 selectbackground=[('readonly', '#FFD700')],
+                 selectforeground=[('readonly', '#000000')])
 
         # Configure window
         self.configure(background='#000000')
 
+        # Set icon
+        try:
+            icon_path = Path(__file__).parent / "assets" / "icon.png"
+            if icon_path.exists():
+                icon = tk.PhotoImage(file=str(icon_path))
+                self.iconphoto(True, icon)
+        except Exception:
+            pass
+
+        # Initialize reader
+        try:
+            from reader import Reader
+            self.reader = Reader()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to initialize reader: {e}")
+            sys.exit(1)
+
         # Variables
         self.file_path = tk.StringVar()
+        self.output_dir = tk.StringVar(value=str(Path.home() / "Downloads"))
         self.voice = tk.StringVar(value="am_michael")
         self.speed = tk.DoubleVar(value=1.0)
         self.output_format = tk.StringVar(value="mp3")
         self.character_voices_enabled = tk.BooleanVar(value=False)
         self.character_config_path = tk.StringVar()
         self.auto_assign_voices = tk.BooleanVar(value=False)
-        self.progress_style = tk.StringVar(value="timeseries")
+        self.progress_style = tk.StringVar(value="none")
+
+        # State
+        self.output_path = None
+        self.progress_queue = queue.Queue()
+        self._load_last_directory()
 
         self.setup_ui()
         self._center_window()
+        self._process_queue()
 
     def setup_ui(self):
         """Build the interface."""
         # File selection
         file_frame = ttk.LabelFrame(self, text="Input File", padding=13)
-        file_frame.pack(fill=tk.X, padx=21, pady=21)
+        file_frame.pack(fill=tk.X, padx=21, pady=(21, 13))
 
         ttk.Entry(file_frame, textvariable=self.file_path).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 13))
         ttk.Button(file_frame, text="Browse...", command=self.browse_file).pack(side=tk.LEFT)
+
+        # Output directory
+        output_frame = ttk.LabelFrame(self, text="Output Directory", padding=13)
+        output_frame.pack(fill=tk.X, padx=21, pady=(0, 13))
+
+        ttk.Entry(output_frame, textvariable=self.output_dir).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 13))
+        ttk.Button(output_frame, text="Browse...", command=self.browse_output_dir).pack(side=tk.LEFT)
 
         # Voice and speed controls
         controls_frame = ttk.Frame(self)
@@ -207,7 +268,7 @@ class AudiobookReaderGUI(ttk.Window):
         scrollbar.config(command=self.progress_text.yview)
 
         # Placeholder text
-        self.progress_text.insert("1.0", "Ready to convert. Select a file and click Convert.\n")
+        self.progress_text.insert("1.0", "Ready to read. Select a file and click Read.\n")
         self.progress_text.config(state="disabled")
 
         # Big yellow Convert button - centered
@@ -216,7 +277,7 @@ class AudiobookReaderGUI(ttk.Window):
 
         self.convert_btn = ttk.Button(
             convert_frame,
-            text="Convert",
+            text="Read",
             command=self.start_conversion,
             style='Convert.TButton',
             width=21
@@ -244,15 +305,11 @@ class AudiobookReaderGUI(ttk.Window):
     def _get_voice_list(self):
         """Get available voices."""
         try:
-            from reader import Reader
-            r = Reader()
-            voices = r.list_voices()
+            voices = self.reader.list_voices()
             return [f"{vid} ({info.get('gender', 'unknown')}, {info.get('language', 'unknown')})"
                    for vid, info in voices.items()]
         except Exception:
-            # Fallback to sample voices if reader not available
-            return ["af_sarah (female, en-us)", "am_michael (male, en-us)",
-                   "bf_emma (female, en-gb)", "bm_george (male, en-gb)"]
+            return ["am_michael (male, en-us)"]
 
     def browse_file(self):
         """Open file dialog for input file."""
@@ -268,6 +325,16 @@ class AudiobookReaderGUI(ttk.Window):
         if filename:
             self.file_path.set(filename)
             self._check_auto_config()
+
+    def browse_output_dir(self):
+        """Open directory dialog for output directory."""
+        directory = filedialog.askdirectory(
+            title="Select Output Directory",
+            initialdir=self.output_dir.get()
+        )
+        if directory:
+            self.output_dir.set(directory)
+            self._save_last_directory()
 
     def _check_auto_config(self):
         """Check for auto-detected character config file."""
@@ -300,19 +367,123 @@ class AudiobookReaderGUI(ttk.Window):
         self.speed_label.config(text=f"{float(value):.1f}x")
 
     def start_conversion(self):
-        """Start conversion (placeholder)."""
+        """Start conversion."""
+        # Validate
+        if not self.file_path.get():
+            messagebox.showerror("Error", "Please select a file to convert")
+            return
+
+        # Extract voice ID from dropdown selection
+        voice_selection = self.voice.get()
+        voice_id = voice_selection.split()[0] if voice_selection else "am_michael"
+
+        # Save last directory
+        self._save_last_directory()
+
+        # Build options
+        options = {
+            'voice': voice_id,
+            'speed': self.speed.get(),
+            'output_format': self.output_format.get(),
+            'output_dir': self.output_dir.get(),
+            'character_voices': self.character_voices_enabled.get(),
+            'character_config': self.character_config_path.get() if self.character_voices_enabled.get() else None,
+            'auto_assign': self.auto_assign_voices.get(),
+            'progress_style': self.progress_style.get()
+        }
+
+        # Clear progress and disable UI
         self.progress_text.config(state="normal")
-        self.progress_text.insert("end", "\n[Conversion logic not yet implemented]\n")
+        self.progress_text.delete("1.0", "end")
+        self.progress_text.insert("end", f"Starting conversion...\n")
+        self.progress_text.insert("end", f"Input: {Path(self.file_path.get()).name}\n")
+        self.progress_text.insert("end", f"Voice: {voice_id}\n")
+        self.progress_text.insert("end", f"Speed: {self.speed.get()}x\n")
+        self.progress_text.insert("end", f"Format: {self.output_format.get().upper()}\n")
+        self.progress_text.insert("end", f"Output: {self.output_dir.get()}\n\n")
         self.progress_text.config(state="disabled")
-        self.progress_text.see("end")
+        self.convert_btn.config(state="disabled", text="Reading...")
+
+        # Start thread
+        try:
+            from .threads import ConversionThread
+        except ImportError:
+            from threads import ConversionThread
+
+        thread = ConversionThread(
+            self.reader,
+            self.file_path.get(),
+            options,
+            self._on_conversion_event
+        )
+        thread.start()
+
+    def _on_conversion_event(self, event_type, data):
+        """Handle conversion events from thread."""
+        self.progress_queue.put((event_type, data))
+
+    def _process_queue(self):
+        """Process queue updates in main thread."""
+        try:
+            while True:
+                event_type, data = self.progress_queue.get_nowait()
+
+                if event_type == 'progress':
+                    self.progress_text.config(state="normal")
+                    self.progress_text.insert("end", data)
+                    self.progress_text.see("end")
+                    self.progress_text.config(state="disabled")
+
+                elif event_type == 'complete':
+                    self.output_path = data
+                    self.convert_btn.config(state="normal", text="Read")
+                    self.preview_btn.config(state="normal")
+                    messagebox.showinfo("Success", f"Conversion complete!\n\nOutput: {data}")
+
+                elif event_type == 'error':
+                    self.convert_btn.config(state="normal", text="Read")
+                    messagebox.showerror("Error", f"Conversion failed:\n\n{data}")
+
+        except queue.Empty:
+            pass
+        finally:
+            self.after(100, self._process_queue)
 
     def preview_audio(self):
-        """Preview audio file (placeholder)."""
-        pass
+        """Preview audio file."""
+        if not self.output_path:
+            messagebox.showwarning("Warning", "No audio file to preview")
+            return
+
+        try:
+            if platform.system() == 'Darwin':
+                subprocess.run(['open', self.output_path])
+            elif platform.system() == 'Windows':
+                subprocess.run(['start', self.output_path], shell=True)
+            else:
+                subprocess.run(['xdg-open', self.output_path])
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open audio file:\n\n{e}")
 
     def open_output_folder(self):
-        """Open output folder (placeholder)."""
-        pass
+        """Open output folder."""
+        if self.output_path:
+            folder = Path(self.output_path).parent
+        elif self.file_path.get():
+            folder = Path(self.file_path.get()).parent
+        else:
+            messagebox.showwarning("Warning", "No output folder to open")
+            return
+
+        try:
+            if platform.system() == 'Darwin':
+                subprocess.run(['open', str(folder)])
+            elif platform.system() == 'Windows':
+                subprocess.run(['explorer', str(folder)])
+            else:
+                subprocess.run(['xdg-open', str(folder)])
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open folder:\n\n{e}")
 
 
     def _center_window(self):
@@ -324,6 +495,25 @@ class AudiobookReaderGUI(ttk.Window):
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f'{width}x{height}+{x}+{y}')
         self.minsize(700, 800)
+
+    def _load_last_directory(self):
+        """Load last used directory from config."""
+        config_file = Path.home() / ".audiobook-reader-gui.conf"
+        if config_file.exists():
+            try:
+                last_dir = config_file.read_text().strip()
+                if Path(last_dir).exists():
+                    self.output_dir.set(last_dir)
+            except Exception:
+                pass
+
+    def _save_last_directory(self):
+        """Save last used directory to config."""
+        config_file = Path.home() / ".audiobook-reader-gui.conf"
+        try:
+            config_file.write_text(self.output_dir.get())
+        except Exception:
+            pass
 
 
 def main():

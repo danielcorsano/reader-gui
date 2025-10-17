@@ -83,6 +83,7 @@ logs/
 # Project-specific
 CLAUDE.md
 plan/
+.audiobook-reader-gui.conf
 
 # Temporary files
 *.tmp
