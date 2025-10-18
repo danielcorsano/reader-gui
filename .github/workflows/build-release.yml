@@ -1,0 +1,150 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'v*-beta'
+      - 'v*-alpha'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Checkout reader dependency
+        run: |
+          cd ..
+          git clone https://github.com/danielcorsano/reader.git
+
+      - name: Install dependencies
+        run: poetry install --with build
+
+      - name: Build macOS app
+        run: poetry run python build_scripts/build_macos.py
+
+      - name: Create ZIP archive
+        run: |
+          cd dist
+          zip -r AudiobookReader-macos.zip AudiobookReader.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: dist/AudiobookReader-macos.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        run: |
+          (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+          echo "$env:APPDATA\Python\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Checkout reader dependency
+        run: |
+          cd ..
+          git clone https://github.com/danielcorsano/reader.git
+
+      - name: Install dependencies
+        run: poetry install --with build
+
+      - name: Build Windows executable
+        run: poetry run python build_scripts/build_windows.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: dist/AudiobookReader.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Checkout reader dependency
+        run: |
+          cd ..
+          git clone https://github.com/danielcorsano/reader.git
+
+      - name: Install dependencies
+        run: poetry install --with build
+
+      - name: Build Linux executable
+        run: poetry run python build_scripts/build_linux.py
+
+      - name: Create tarball
+        run: |
+          cd dist
+          tar -czf AudiobookReader-linux.tar.gz audiobook-reader-gui
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: dist/AudiobookReader-linux.tar.gz
+
+  create-release:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Check if pre-release
+        id: prerelease
+        run: |
+          if [[ "${{ github.ref_name }}" =~ (alpha|beta|rc) ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/macos-build/AudiobookReader-macos.zip
+            artifacts/windows-build/AudiobookReader.exe
+            artifacts/linux-build/AudiobookReader-linux.tar.gz
+          draft: false
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
