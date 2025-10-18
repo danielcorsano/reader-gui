@@ -15,38 +15,48 @@ class RealtimeStdoutCapture:
         self.callback = callback
         self.buffer = StringIO()
         self.start_time = time.time()
+        self.last_update = 0
+        self.update_interval = 0.1  # Send updates every 100ms for smoother visualization
 
     def write(self, text):
         """Intercept write calls and parse for progress."""
         self.buffer.write(text)
 
-        # Parse progress from text (look for patterns like "chunk 10/100")
-        # This is a simple parser - adjust based on actual output format
-        if 'chunk' in text.lower() or 'progress' in text.lower():
-            try:
-                # Try to extract chunk numbers
-                match = re.search(r'(\d+)/(\d+)', text)
-                if match:
-                    current = int(match.group(1))
-                    total = int(match.group(2))
-                    elapsed = time.time() - self.start_time
+        # Parse progress from text more aggressively
+        # Look for various progress patterns: "chunk X/Y", "X/Y", "Processing chunk X"
+        try:
+            # Multiple pattern matching for better coverage
+            match = re.search(r'(\d+)\s*/\s*(\d+)', text)  # Matches "X/Y" or "X / Y"
+            if not match:
+                match = re.search(r'chunk\s+(\d+).*?(\d+)', text, re.IGNORECASE)  # "chunk X of Y"
 
-                    # Estimate speed and ETA
-                    if current > 0 and elapsed > 0:
-                        speed = (current / elapsed) * 60  # chunks per minute
-                        remaining = total - current
-                        eta = (remaining / speed) * 60 if speed > 0 else 0
+            if match:
+                current = int(match.group(1))
+                total = int(match.group(2))
+                elapsed = time.time() - self.start_time
 
-                        # Send progress event
-                        self.callback('realtime_progress', {
-                            'chunk': current,
-                            'total': total,
-                            'speed': speed,
-                            'elapsed': elapsed,
-                            'eta': eta
-                        })
-            except Exception:
-                pass  # Ignore parsing errors
+                # Throttle updates to avoid flooding GUI (but still more frequent than before)
+                current_time = time.time()
+                if current_time - self.last_update < self.update_interval:
+                    return
+                self.last_update = current_time
+
+                # Estimate speed and ETA
+                if current > 0 and elapsed > 0:
+                    speed = (current / elapsed) * 60  # chunks per minute
+                    remaining = total - current
+                    eta = (remaining / speed) * 60 if speed > 0 else 0
+
+                    # Send progress event
+                    self.callback('realtime_progress', {
+                        'chunk': current,
+                        'total': total,
+                        'speed': speed,
+                        'elapsed': elapsed,
+                        'eta': eta
+                    })
+        except Exception:
+            pass  # Ignore parsing errors
 
     def flush(self):
         """Flush buffer."""
@@ -66,32 +76,22 @@ class ConversionThread(threading.Thread):
         self.file_path = Path(file_path)
         self.options = options
         self.callback = callback
+        self.cancel_event = threading.Event()
 
     def run(self):
         """Run conversion in background."""
-        import os
         old_stdout = sys.stdout
-        original_dir = os.getcwd()
 
         try:
-            # Setup output directory
-            output_dir = Path(self.options.get('output_dir', Path.home() / "Downloads"))
-            output_dir.mkdir(parents=True, exist_ok=True)
-
-            # Convert to absolute path before chdir
-            absolute_file_path = os.path.abspath(self.file_path)
-
-            # Change to output directory so reader creates temp files there
-            os.chdir(output_dir)
-
             # Redirect stdout to capture progress in real-time
             sys.stdout = RealtimeStdoutCapture(self.callback)
 
             convert_kwargs = {
-                'file_path': absolute_file_path,
+                'file_path': str(self.file_path),
                 'voice': self.options['voice'],
                 'speed': self.options['speed'],
-                'output_format': self.options['output_format']
+                'output_format': self.options['output_format'],
+                'output_dir': self.options.get('output_dir')
             }
 
             # Add character voices if enabled
@@ -107,11 +107,8 @@ class ConversionThread(threading.Thread):
             if progress_style != 'none':
                 convert_kwargs['progress_style'] = 'simple'
 
-            # Run conversion (outputs to current directory = output_dir)
+            # Run conversion - backend handles all temp files and output location
             output_path = self.reader.convert(**convert_kwargs)
-
-            # Restore directory
-            os.chdir(original_dir)
 
             # Get captured output
             progress_output = sys.stdout.getvalue()
@@ -122,9 +119,9 @@ class ConversionThread(threading.Thread):
             self.callback('complete', str(output_path))
 
         except Exception as e:
-            try:
-                os.chdir(original_dir)
-            except:
-                pass
             sys.stdout = old_stdout
             self.callback('error', str(e))
+
+    def cancel(self):
+        """Request cancellation of the conversion."""
+        self.cancel_event.set()

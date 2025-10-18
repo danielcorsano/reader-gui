@@ -119,6 +119,8 @@ class AudiobookReaderGUI(ttk.Window):
         # State
         self.output_path = None
         self.progress_queue = queue.Queue()
+        self.conversion_thread = None
+        self.is_paused = False
         self._load_last_directory()
 
         self.setup_ui()
@@ -298,7 +300,7 @@ class AudiobookReaderGUI(ttk.Window):
         self.convert_btn = ttk.Button(
             convert_frame,
             text="Read",
-            command=self.start_conversion,
+            command=self.toggle_conversion,
             style='Convert.TButton',
             width=13
         )
@@ -369,6 +371,15 @@ class AudiobookReaderGUI(ttk.Window):
         """Update speed display label."""
         self.speed_label.config(text=f"{float(value):.1f}x")
 
+    def toggle_conversion(self):
+        """Toggle between read and pause."""
+        if self.conversion_thread and self.conversion_thread.is_alive():
+            # Currently running, so pause it
+            self.pause_conversion()
+        else:
+            # Not running, so start/resume
+            self.start_conversion()
+
     def start_conversion(self):
         """Start conversion."""
         # Validate
@@ -395,7 +406,7 @@ class AudiobookReaderGUI(ttk.Window):
             'progress_style': self.progress_style.get()
         }
 
-        # Clear progress and disable UI
+        # Clear progress and update UI
         self.progress_text.config(state="normal")
         self.progress_text.delete("1.0", "end")
         self.progress_text.insert("end", f"Starting conversion...\n")
@@ -405,7 +416,10 @@ class AudiobookReaderGUI(ttk.Window):
         self.progress_text.insert("end", f"Format: {self.output_format.get().upper()}\n")
         self.progress_text.insert("end", f"Output: {self.output_dir.get()}\n\n")
         self.progress_text.config(state="disabled")
-        self.convert_btn.config(state="disabled", text="Reading...")
+
+        # Change button to Pause
+        self.is_paused = False
+        self.convert_btn.config(text="Pause")
 
         # Setup visualization if enabled
         if self.show_visualization.get():
@@ -417,13 +431,24 @@ class AudiobookReaderGUI(ttk.Window):
         except ImportError:
             from threads import ConversionThread
 
-        thread = ConversionThread(
+        self.conversion_thread = ConversionThread(
             self.reader,
             self.file_path.get(),
             options,
             self._on_conversion_event
         )
-        thread.start()
+        self.conversion_thread.start()
+
+    def pause_conversion(self):
+        """Pause ongoing conversion."""
+        if self.conversion_thread and self.conversion_thread.is_alive():
+            self.conversion_thread.cancel()
+            self.is_paused = True
+            self.progress_text.config(state="normal")
+            self.progress_text.insert("end", "\n\nPaused. Click Read to resume from checkpoint.\n")
+            self.progress_text.config(state="disabled")
+            self.convert_btn.config(text="Read")
+            # Backend will save checkpoint before stopping, allowing resume
 
     def _on_conversion_event(self, event_type, data):
         """Handle conversion events from thread."""
@@ -454,11 +479,15 @@ class AudiobookReaderGUI(ttk.Window):
 
                 elif event_type == 'complete':
                     self.output_path = data
+                    self.is_paused = False
+                    self.conversion_thread = None
                     self.convert_btn.config(state="normal", text="Read")
                     self._cleanup_visualization()
                     messagebox.showinfo("Success", f"Conversion complete!\n\nOutput: {data}")
 
                 elif event_type == 'error':
+                    self.is_paused = False
+                    self.conversion_thread = None
                     self.convert_btn.config(state="normal", text="Read")
                     self._cleanup_visualization()
                     messagebox.showerror("Error", f"Conversion failed:\n\n{data}")
@@ -573,14 +602,14 @@ class AudiobookReaderGUI(ttk.Window):
         self.speed_label.pack(side=tk.LEFT, padx=(0, 13))
         self.eta_label.pack(side=tk.LEFT)
 
-        # Create figure
-        self.viz_fig = Figure(figsize=(5, 3), facecolor='#000000')
+        # Create figure with constrained size to not push button off screen
+        self.viz_fig = Figure(figsize=(5.5, 2), facecolor='#000000')
         self.viz_ax = self.viz_fig.add_subplot(111, facecolor='#000000')
 
         # Style
-        self.viz_ax.set_xlabel('Time (min)', color='#FFD700', fontsize=10)
-        self.viz_ax.set_ylabel('Speed (chunks/min)', color='#FFD700', fontsize=10)
-        self.viz_ax.tick_params(colors='#FFD700', labelsize=9)
+        self.viz_ax.set_xlabel('Time (min)', color='#FFD700', fontsize=9)
+        self.viz_ax.set_ylabel('Speed (chunks/min)', color='#FFD700', fontsize=9)
+        self.viz_ax.tick_params(colors='#FFD700', labelsize=8)
         self.viz_ax.grid(True, alpha=0.2, color='#555555')
         self.viz_ax.spines['bottom'].set_color('#FFD700')
         self.viz_ax.spines['left'].set_color('#FFD700')
@@ -597,11 +626,13 @@ class AudiobookReaderGUI(ttk.Window):
         self.viz_ax.set_xlim(0, 1)
         self.viz_ax.set_ylim(0, 10)
 
-        # Embed in container
+        # Embed in container with fixed height to prevent window resize
         self.viz_container.pack(fill=tk.X, pady=(0, 8))
         self.viz_canvas = FigureCanvasTkAgg(self.viz_fig, master=self.viz_container)
         self.viz_canvas.draw()
-        self.viz_canvas.get_tk_widget().pack(fill=tk.X)
+        canvas_widget = self.viz_canvas.get_tk_widget()
+        canvas_widget.configure(height=160)  # Fixed pixel height
+        canvas_widget.pack(fill=tk.X)
 
     def _update_visualization(self, chunk, total, speed, elapsed, eta):
         """Update embedded visualization."""
