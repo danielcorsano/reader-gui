@@ -103,14 +103,8 @@ class AudiobookReaderGUI(ttk.Window):
         except Exception:
             pass
 
-        # Initialize reader with FFmpeg auto-download
+        # Initialize reader
         try:
-            import imageio_ffmpeg
-            import os
-            ffmpeg_dir = str(Path(imageio_ffmpeg.get_ffmpeg_exe()).parent)
-            # Append to PATH (system ffmpeg takes priority if present)
-            os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + ffmpeg_dir
-
             from reader import Reader
             self.reader = Reader()
         except Exception as e:
@@ -417,6 +411,30 @@ class AudiobookReaderGUI(ttk.Window):
         if not self.file_path.get():
             messagebox.showerror("Error", "Please select a file to convert")
             return
+
+        # Setup FFmpeg (download only if not installed)
+        import shutil
+        import os
+        if not shutil.which('ffmpeg'):
+            # No system FFmpeg - download bundled version (first time only)
+            try:
+                self.progress_text.config(state="normal")
+                self.progress_text.insert("end", "Downloading FFmpeg (first time only)...\n")
+                self.progress_text.config(state="disabled")
+                self.update_idletasks()
+
+                import imageio_ffmpeg
+                ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+                ffmpeg_dir = str(Path(ffmpeg_exe).parent)
+                os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + ffmpeg_dir
+
+                self.progress_text.config(state="normal")
+                self.progress_text.insert("end", "FFmpeg downloaded.\n\n")
+                self.progress_text.config(state="disabled")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to download FFmpeg: {e}\n\nPlease install FFmpeg manually or check your internet connection.")
+                self.convert_btn.config(text="Read")
+                return
 
         # Extract voice ID from dropdown selection
         voice_selection = self.voice.get()
