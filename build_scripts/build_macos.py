@@ -84,6 +84,14 @@ def build_macos():
         "--collect-all=language_tags",  # Fix for missing JSON data files
         "--collect-all=babel",  # Locale data
         "--collect-all=ebooklib",  # EPUB data
+        # Exclude test frameworks and unused modules to reduce size
+        "--exclude-module=pytest",
+        "--exclude-module=pytest_cov",
+        "--exclude-module=unittest",
+        "--exclude-module=test",
+        "--exclude-module=matplotlib.tests",
+        "--exclude-module=PIL.tests",
+        "--exclude-module=numpy.tests",
         "--noconfirm",
         "--clean",
     ]
