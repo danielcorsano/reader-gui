@@ -102,6 +102,13 @@ def build_macos():
 
     PyInstaller.__main__.run(args)
 
+    # Remove bundled FFmpeg binary - let imageio-ffmpeg download correct version on first use
+    app_contents = PROJECT_ROOT / "dist" / "AudiobookReader.app" / "Contents"
+    for ffmpeg_file in app_contents.rglob("ffmpeg-*"):
+        if ffmpeg_file.is_file():
+            ffmpeg_file.unlink()
+            print(f"Removed bundled FFmpeg: {ffmpeg_file.name}")
+
     # Clean up redundant AudiobookReader directory created by onedir mode
     redundant_dir = PROJECT_ROOT / "dist" / "AudiobookReader"
     if redundant_dir.exists():
