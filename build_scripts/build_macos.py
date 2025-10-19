@@ -92,7 +92,6 @@ def build_macos():
         "--exclude-module=matplotlib.tests",
         "--exclude-module=PIL.tests",
         "--exclude-module=numpy.tests",
-        "--exclude-module=imageio_ffmpeg",  # Let it download correct FFmpeg on first use
         "--noconfirm",
         "--clean",
     ]
