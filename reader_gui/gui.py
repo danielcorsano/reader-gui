@@ -87,17 +87,23 @@ class AudiobookReaderGUI(ttk.Window):
         # Configure window
         self.configure(background='#000000')
 
-        # Set icon
+        # Set Tkinter window icon (overrides default Python icon in dock)
         try:
             icon_path = Path(__file__).parent / "assets" / "icon.png"
             if icon_path.exists():
                 icon = tk.PhotoImage(file=str(icon_path))
                 self.iconphoto(True, icon)
         except Exception:
-            pass
+            pass  # Icon not critical
 
-        # Initialize reader
+        # Initialize reader with bundled FFmpeg as fallback
         try:
+            import imageio_ffmpeg
+            import os
+            ffmpeg_dir = str(Path(imageio_ffmpeg.get_ffmpeg_exe()).parent)
+            # Append to PATH (system ffmpeg takes priority if present)
+            os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + ffmpeg_dir
+
             from reader import Reader
             self.reader = Reader()
         except Exception as e:
@@ -308,11 +314,29 @@ class AudiobookReaderGUI(ttk.Window):
 
 
     def _get_voice_list(self):
-        """Get available voices."""
+        """Get available voices grouped by language and sorted alphabetically."""
         try:
             voices = self.reader.list_voices()
-            return [f"{vid} ({info.get('gender', 'unknown')}, {info.get('language', 'unknown')})"
-                   for vid, info in voices.items()]
+
+            # Group voices by language
+            from collections import defaultdict
+            by_language = defaultdict(list)
+
+            for vid, info in voices.items():
+                lang = info.get('lang', 'unknown')
+                gender = info.get('gender', 'unknown')
+                name = info.get('name', vid)
+                by_language[lang].append((name, vid, gender, lang))
+
+            # Sort languages alphabetically, then voices within each language
+            result = []
+            for lang in sorted(by_language.keys()):
+                # Sort voices alphabetically by name within language
+                sorted_voices = sorted(by_language[lang], key=lambda x: x[0])
+                for name, vid, gender, lang in sorted_voices:
+                    result.append(f"{vid} ({gender}, {lang})")
+
+            return result
         except Exception:
             return ["am_michael (male, en-us)"]
 

@@ -17,6 +17,15 @@ def build_macos():
     # Change to project root for relative paths
     os.chdir(PROJECT_ROOT)
 
+    # Check that reader package exists
+    reader_path = PROJECT_ROOT.parent / "reader"
+    if not reader_path.exists():
+        print(f"\n❌ ERROR: Reader package not found at {reader_path}")
+        print("   Make sure the reader package is in ../reader/")
+        sys.exit(1)
+
+    print(f"✓ Found reader package at {reader_path}")
+
     args = [
         str(PROJECT_ROOT / "reader_gui" / "gui.py"),
         "--name=AudiobookReader",
@@ -24,6 +33,7 @@ def build_macos():
         "--onedir",
         f"--icon={ICON_PATH}",
         f"--add-data={ASSETS_PATH}{os.pathsep}reader_gui/assets",
+        f"--paths={reader_path}",  # Tell PyInstaller where to find reader
         # Reader backend package
         "--hidden-import=reader",
         "--hidden-import=reader.cli",
@@ -65,11 +75,15 @@ def build_macos():
         "--hidden-import=onnxruntime",
         "--hidden-import=pydub",
         "--hidden-import=yaml",
-        # Collect data files
+        # Collect data files from dependencies
+        "--collect-all=reader",  # Entire reader package
         "--collect-all=kokoro_onnx",
         "--collect-all=onnxruntime",
         "--collect-all=matplotlib",
         "--collect-all=ttkbootstrap",
+        "--collect-all=language_tags",  # Fix for missing JSON data files
+        "--collect-all=babel",  # Locale data
+        "--collect-all=ebooklib",  # EPUB data
         "--noconfirm",
         "--clean",
     ]
