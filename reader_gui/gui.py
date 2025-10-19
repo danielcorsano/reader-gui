@@ -103,14 +103,8 @@ class AudiobookReaderGUI(ttk.Window):
         except Exception:
             pass
 
-        # Initialize reader with bundled FFmpeg as fallback
+        # Initialize reader
         try:
-            import imageio_ffmpeg
-            import os
-            ffmpeg_dir = str(Path(imageio_ffmpeg.get_ffmpeg_exe()).parent)
-            # Append to PATH (system ffmpeg takes priority if present)
-            os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + ffmpeg_dir
-
             from reader import Reader
             self.reader = Reader()
         except Exception as e:
