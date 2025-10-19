@@ -87,14 +87,21 @@ class AudiobookReaderGUI(ttk.Window):
         # Configure window
         self.configure(background='#000000')
 
-        # Set Tkinter window icon (overrides default Python icon in dock)
+        # Set window icon
         try:
-            icon_path = Path(__file__).parent / "assets" / "icon.png"
+            if getattr(sys, 'frozen', False):
+                # PyInstaller bundle - assets in Resources/reader_gui/
+                base_path = Path(sys._MEIPASS) / "reader_gui"
+            else:
+                # Running from source
+                base_path = Path(__file__).parent
+
+            icon_path = base_path / "assets" / "icon.png"
             if icon_path.exists():
                 icon = tk.PhotoImage(file=str(icon_path))
                 self.iconphoto(True, icon)
         except Exception:
-            pass  # Icon not critical
+            pass
 
         # Initialize reader with bundled FFmpeg as fallback
         try:
