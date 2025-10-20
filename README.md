@@ -66,13 +66,6 @@ poetry install --with build
 poetry run python build_scripts/build_macos.py
 ```
 
-## Architecture
-
-Separate frontend for audiobook-reader backend via path dependency:
-```toml
-audiobook-reader = { path = "../reader", develop = true }
-```
-
 ## License
 
 MIT
