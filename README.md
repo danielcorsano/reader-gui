@@ -1,13 +1,11 @@
 # Audiobook Reader GUI
 
-Desktop GUI for [audiobook-reader](https://github.com/danielcorsano/reader) with Monaco font and black/yellow design.
-
-Convert ebooks and text files to audiobooks with 48 neural voices and real-time progress visualization.
+Desktop GUI for [audiobook-reader](https://github.com/danielcorsano/reader). Convert ebooks and text files to audiobooks with realistic AI voices up to 8x faster than real-time.
 
 ## Features
 
-- **48 Neural Voices**: Kokoro-82M TTS (8 languages)
-- **Multiple Formats**: EPUB, PDF, TXT, Markdown, RST → MP3/WAV/M4A/M4B
+- **48 Voices**: Kokoro-82M TTS (8 languages)
+- **Multiple Input Formats**: EPUB, PDF, TXT, Markdown, RST → MP3/WAV/M4A/M4B
 - **Character Voices**: Assign different voices to characters with auto-detection
 - **Real-time Progress**: Timeseries visualization with speed graphs and ETA
 - **Audio Preview**: Play output directly from GUI
