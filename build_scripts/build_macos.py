@@ -84,14 +84,6 @@ def build_macos():
         "--collect-all=language_tags",  # Fix for missing JSON data files
         "--collect-all=babel",  # Locale data
         "--collect-all=ebooklib",  # EPUB data
-        # Exclude test frameworks and unused modules to reduce size
-        "--exclude-module=pytest",
-        "--exclude-module=pytest_cov",
-        "--exclude-module=unittest",
-        "--exclude-module=test",
-        "--exclude-module=matplotlib.tests",
-        "--exclude-module=PIL.tests",
-        "--exclude-module=numpy.tests",
         "--noconfirm",
         "--clean",
     ]
@@ -101,13 +93,6 @@ def build_macos():
     print(f"Assets: {ASSETS_PATH}")
 
     PyInstaller.__main__.run(args)
-
-    # Remove bundled FFmpeg binary - let imageio-ffmpeg download correct version on first use
-    app_contents = PROJECT_ROOT / "dist" / "AudiobookReader.app" / "Contents"
-    for ffmpeg_file in app_contents.rglob("ffmpeg-*"):
-        if ffmpeg_file.is_file():
-            ffmpeg_file.unlink()
-            print(f"Removed bundled FFmpeg: {ffmpeg_file.name}")
 
     # Clean up redundant AudiobookReader directory created by onedir mode
     redundant_dir = PROJECT_ROOT / "dist" / "AudiobookReader"

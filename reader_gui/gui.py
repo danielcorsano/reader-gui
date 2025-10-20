@@ -103,6 +103,13 @@ class AudiobookReaderGUI(ttk.Window):
         except Exception:
             pass
 
+        # Add common FFmpeg locations to PATH for .app bundles
+        import os
+        common_paths = ['/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin']
+        for path in common_paths:
+            if path not in os.environ.get('PATH', ''):
+                os.environ['PATH'] = path + os.pathsep + os.environ.get('PATH', '')
+
         # Initialize reader
         try:
             from reader import Reader
@@ -120,14 +127,16 @@ class AudiobookReaderGUI(ttk.Window):
         self.character_voices_enabled = tk.BooleanVar(value=False)
         self.character_config_path = tk.StringVar()
         self.auto_assign_voices = tk.BooleanVar(value=False)
-        self.progress_style = tk.StringVar(value="none")
+        self.progress_style = tk.StringVar(value="timeseries")
         self.show_visualization = tk.BooleanVar(value=True)
+        self.debug_mode = tk.BooleanVar(value=False)
 
         # State
         self.output_path = None
         self.progress_queue = queue.Queue()
         self.conversion_thread = None
         self.is_paused = False
+        self.debug_console = None
         self._load_last_directory()
 
         self.setup_ui()
@@ -212,6 +221,13 @@ class AudiobookReaderGUI(ttk.Window):
             viz_frame,
             text="Show Visualization",
             variable=self.show_visualization
+        ).pack(anchor=tk.W, padx=8, pady=3)
+
+        ttk.Checkbutton(
+            viz_frame,
+            text="Debug Mode",
+            variable=self.debug_mode,
+            command=self.toggle_debug_console
         ).pack(anchor=tk.W, padx=8, pady=3)
 
         # Character voices
@@ -415,6 +431,12 @@ class AudiobookReaderGUI(ttk.Window):
         # Setup FFmpeg (download only if not installed)
         import shutil
         import os
+
+        if self.debug_mode.get():
+            ffmpeg_path = shutil.which('ffmpeg')
+            self.debug_log(f"FFmpeg before check: {ffmpeg_path or 'NOT FOUND'}")
+            self.debug_log(f"PATH: {os.environ.get('PATH', '')}")
+
         if not shutil.which('ffmpeg'):
             # No system FFmpeg - download bundled version (first time only)
             try:
@@ -429,8 +451,11 @@ class AudiobookReaderGUI(ttk.Window):
                 os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + ffmpeg_dir
 
                 self.progress_text.config(state="normal")
-                self.progress_text.insert("end", "FFmpeg downloaded.\n\n")
+                self.progress_text.insert("end", "FFmpeg ready.\n\n")
                 self.progress_text.config(state="disabled")
+
+                if self.debug_mode.get():
+                    self.debug_log(f"Downloaded FFmpeg to: {ffmpeg_exe}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to download FFmpeg: {e}\n\nPlease install FFmpeg manually or check your internet connection.")
                 self.convert_btn.config(text="Read")
@@ -452,12 +477,20 @@ class AudiobookReaderGUI(ttk.Window):
             'character_voices': self.character_voices_enabled.get(),
             'character_config': self.character_config_path.get() if self.character_voices_enabled.get() else None,
             'auto_assign': self.auto_assign_voices.get(),
-            'progress_style': self.progress_style.get()
+            'progress_style': self.progress_style.get(),
+            'debug': self.debug_mode.get()
         }
 
         # Clear progress and update UI
         self.progress_text.config(state="normal")
         self.progress_text.delete("1.0", "end")
+
+        if self.debug_mode.get():
+            self.debug_log(f"Debug mode enabled")
+            self.debug_log(f"Reader instance: {self.reader}")
+            self.debug_log(f"File: {self.file_path.get()}")
+            self.debug_log(f"Voice: {voice_id}")
+
         self.progress_text.insert("end", f"Starting conversion...\n")
         self.progress_text.insert("end", f"Input: {Path(self.file_path.get()).name}\n")
         self.progress_text.insert("end", f"Voice: {voice_id}\n")
@@ -465,6 +498,7 @@ class AudiobookReaderGUI(ttk.Window):
         self.progress_text.insert("end", f"Format: {self.output_format.get().upper()}\n")
         self.progress_text.insert("end", f"Output: {self.output_dir.get()}\n\n")
         self.progress_text.config(state="disabled")
+        self.update_idletasks()
 
         # Change button to Pause
         self.is_paused = False
@@ -475,10 +509,16 @@ class AudiobookReaderGUI(ttk.Window):
             self._setup_visualization()
 
         # Start thread
-        try:
-            from .threads import ConversionThread
-        except ImportError:
-            from threads import ConversionThread
+        if self.debug_mode.get():
+            self.debug_log("Importing ConversionThread...")
+
+        from reader_gui.threads import ConversionThread
+
+        if self.debug_mode.get():
+            self.debug_log("Import succeeded")
+
+        if self.debug_mode.get():
+            self.debug_log("Creating conversion thread...")
 
         self.conversion_thread = ConversionThread(
             self.reader,
@@ -486,7 +526,14 @@ class AudiobookReaderGUI(ttk.Window):
             options,
             self._on_conversion_event
         )
+
+        if self.debug_mode.get():
+            self.debug_log("Starting thread...")
+
         self.conversion_thread.start()
+
+        if self.debug_mode.get():
+            self.debug_log("Thread started, waiting for output...")
 
     def pause_conversion(self):
         """Pause ongoing conversion."""
@@ -541,6 +588,9 @@ class AudiobookReaderGUI(ttk.Window):
                     self._cleanup_visualization()
                     messagebox.showerror("Error", f"Conversion failed:\n\n{data}")
 
+                elif event_type == 'debug':
+                    self.debug_log(data)
+
         except queue.Empty:
             pass
         finally:
@@ -587,10 +637,8 @@ class AudiobookReaderGUI(ttk.Window):
         """Center window on screen, size based on content."""
         self.update_idletasks()
 
-        # Let content determine height, set reasonable width
-        width = 610
-
-        # Get actual required height from packed widgets
+        # Get actual required size from packed widgets
+        required_width = self.winfo_reqwidth()
         required_height = self.winfo_reqheight()
 
         screen_width = self.winfo_screenwidth()
@@ -600,15 +648,60 @@ class AudiobookReaderGUI(ttk.Window):
         max_width = int(screen_width * 0.85)
         max_height = int(screen_height * 0.85)
 
-        height = min(required_height + 50, max_height)
-        if width > max_width:
-            width = max_width
+        # Use content size with padding, capped at max
+        width = min(max(required_width + 40, 610), max_width)
+        height = min(max(required_height + 100, 750), max_height)
 
         x = (screen_width // 2) - (width // 2)
         y = (screen_height // 2) - (height // 2)
         self.geometry(f'{width}x{height}+{x}+{y}')
 
-        self.minsize(377, 610)
+        self.minsize(610, 750)
+
+    def toggle_debug_console(self):
+        """Toggle debug console window."""
+        if self.debug_mode.get():
+            if not self.debug_console or not self.debug_console.winfo_exists():
+                self.debug_console = tk.Toplevel(self)
+                self.debug_console.title("Debug Console - Audiobook Reader")
+                self.debug_console.geometry("900x500")
+
+                # Keep window on top and focused
+                self.debug_console.lift()
+                self.debug_console.focus_force()
+                self.debug_console.attributes('-topmost', True)
+                self.after(100, lambda: self.debug_console.attributes('-topmost', False))
+
+                text_frame = ttk.Frame(self.debug_console)
+                text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+                self.debug_text = tk.Text(
+                    text_frame,
+                    wrap=tk.WORD,
+                    font=("Monaco", 10),
+                    bg="#000000",
+                    fg="#FFD700",
+                    state=tk.DISABLED
+                )
+                scrollbar = ttk.Scrollbar(text_frame, command=self.debug_text.yview)
+                self.debug_text.config(yscrollcommand=scrollbar.set)
+
+                self.debug_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+                scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+                self.debug_log("=== Debug Console Opened ===")
+                self.debug_log(f"App running from: {sys.executable if getattr(sys, 'frozen', False) else 'source'}")
+        else:
+            if self.debug_console and self.debug_console.winfo_exists():
+                self.debug_console.destroy()
+
+    def debug_log(self, message):
+        """Write message to debug console."""
+        if self.debug_mode.get() and self.debug_console and self.debug_console.winfo_exists():
+            self.debug_text.config(state=tk.NORMAL)
+            self.debug_text.insert(tk.END, f"{message}\n")
+            self.debug_text.see(tk.END)
+            self.debug_text.config(state=tk.DISABLED)
 
     def _load_last_directory(self):
         """Load last used directory from config."""

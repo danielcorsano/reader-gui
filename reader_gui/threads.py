@@ -81,6 +81,7 @@ class ConversionThread(threading.Thread):
     def run(self):
         """Run conversion in background."""
         old_stdout = sys.stdout
+        debug = self.options.get('debug', False)
 
         try:
             # Redirect stdout to capture progress in real-time
@@ -102,10 +103,12 @@ class ConversionThread(threading.Thread):
                 if self.options.get('auto_assign'):
                     convert_kwargs['auto_assign'] = True
 
-            # Set progress style (none works best with GUI)
-            progress_style = self.options.get('progress_style', 'none')
-            if progress_style != 'none':
-                convert_kwargs['progress_style'] = 'simple'
+            # Use progress style from options (timeseries for visualization)
+            if self.options.get('progress_style'):
+                convert_kwargs['progress_style'] = self.options['progress_style']
+
+            if debug:
+                self.callback('debug', f"Starting conversion with: {convert_kwargs}")
 
             # Run conversion - backend handles all temp files and output location
             output_path = self.reader.convert(**convert_kwargs)
@@ -120,7 +123,12 @@ class ConversionThread(threading.Thread):
 
         except Exception as e:
             sys.stdout = old_stdout
-            self.callback('error', str(e))
+            if debug:
+                import traceback
+                error_msg = f"{str(e)}\n\n[DEBUG] Traceback:\n{traceback.format_exc()}"
+                self.callback('error', error_msg)
+            else:
+                self.callback('error', str(e))
 
     def cancel(self):
         """Request cancellation of the conversion."""
