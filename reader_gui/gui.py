@@ -432,34 +432,6 @@ class AudiobookReaderGUI(ttk.Window):
         import shutil
         import os
 
-        if self.debug_mode.get():
-            ffmpeg_path = shutil.which('ffmpeg')
-            self.debug_log(f"FFmpeg before check: {ffmpeg_path or 'NOT FOUND'}")
-            self.debug_log(f"PATH: {os.environ.get('PATH', '')}")
-
-        if not shutil.which('ffmpeg'):
-            # No system FFmpeg - download bundled version (first time only)
-            try:
-                self.progress_text.config(state="normal")
-                self.progress_text.insert("end", "Downloading FFmpeg (first time only)...\n")
-                self.progress_text.config(state="disabled")
-                self.update_idletasks()
-
-                import imageio_ffmpeg
-                ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-                ffmpeg_dir = str(Path(ffmpeg_exe).parent)
-                os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + ffmpeg_dir
-
-                self.progress_text.config(state="normal")
-                self.progress_text.insert("end", "FFmpeg ready.\n\n")
-                self.progress_text.config(state="disabled")
-
-                if self.debug_mode.get():
-                    self.debug_log(f"Downloaded FFmpeg to: {ffmpeg_exe}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to download FFmpeg: {e}\n\nPlease install FFmpeg manually or check your internet connection.")
-                self.convert_btn.config(text="Read")
-                return
 
         # Extract voice ID from dropdown selection
         voice_selection = self.voice.get()
@@ -821,10 +793,22 @@ class AudiobookReaderGUI(ttk.Window):
             self.progress_text.master.pack(fill=tk.X)
 
 
+from reader_gui.dependency_check import run_dependency_check
+
+
 def main():
     """Entry point."""
+    # Create the main window, but keep it hidden initially
     app = AudiobookReaderGUI()
+    app.withdraw()
+
+    # Run dependency check. It will show a popup if needed and handle quitting.
+    # If dependencies are met, it will show the main window.
+    run_dependency_check(app)
+
+    # Start the main event loop
     app.mainloop()
+
 
 
 if __name__ == "__main__":
