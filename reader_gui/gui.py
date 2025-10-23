@@ -103,13 +103,6 @@ class AudiobookReaderGUI(ttk.Window):
         except Exception:
             pass
 
-        # Add common FFmpeg locations to PATH for .app bundles
-        import os
-        common_paths = ['/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin']
-        for path in common_paths:
-            if path not in os.environ.get('PATH', ''):
-                os.environ['PATH'] = path + os.pathsep + os.environ.get('PATH', '')
-
         # Initialize reader
         try:
             from reader import Reader
@@ -427,11 +420,6 @@ class AudiobookReaderGUI(ttk.Window):
         if not self.file_path.get():
             messagebox.showerror("Error", "Please select a file to convert")
             return
-
-        # Setup FFmpeg (download only if not installed)
-        import shutil
-        import os
-
 
         # Extract voice ID from dropdown selection
         voice_selection = self.voice.get()

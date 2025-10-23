@@ -8,17 +8,7 @@ from pathlib import Path
 import threading
 import shutil
 import platform
-from urllib.request import urlretrieve
 import os
-
-# Define model path using a robust method
-try:
-    # This is the ideal way, if reader is installed
-    from reader.utils.setup import get_model_path
-    MODEL_PATH = get_model_path()
-except (ImportError, ModuleNotFoundError):
-    # Fallback for bundled app or initial setup
-    MODEL_PATH = Path.home() / ".local" / "share" / "reader" / "model.onnx"
 
 
 def check_dependencies():
@@ -26,8 +16,18 @@ def check_dependencies():
     missing = []
     if not shutil.which("ffmpeg"):
         missing.append("ffmpeg")
-    if not MODEL_PATH.exists():
+
+    # Check if reader models exist
+    try:
+        from reader.utils.model_downloader import get_cache_dir
+        cache = get_cache_dir() / "kokoro"
+        model = cache / "kokoro-v1.0.onnx"
+        voices = cache / "voices-v1.0.bin"
+        if not (model.exists() and voices.exists()):
+            missing.append("model")
+    except Exception:
         missing.append("model")
+
     return missing
 
 
@@ -53,9 +53,18 @@ class DependencyPopup(tk.Toplevel):
         style.configure('Dep.TButton', background='#FFD700', foreground='#000000', font=("Monaco", 13), padding=(10, 5))
         style.configure('Dep.TLabelframe', background='#000000', foreground='#FFD700', bordercolor='#FFD700')
         style.configure('Dep.TLabelframe.Label', background='#000000', foreground='#FFD700', font=("Monaco", 13, "bold"))
-style.configure('TProgressbar', troughcolor='#333333', background='#FFD700', thickness=20)
-...
-self.progress = ttk.Progressbar(main_frame, mode='determinate', style='TProgressbar', length=400)
+        style.configure('TProgressbar', troughcolor='#333333', background='#FFD700', thickness=20)
+
+        main_frame = ttk.Frame(self, padding=20, style='Dep.TFrame')
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        missing_text = "Missing: " + ", ".join(missing)
+        ttk.Label(main_frame, text=missing_text, style='Dep.TLabel').pack(pady=(0, 10))
+
+        self.status_label = ttk.Label(main_frame, text="Click Download to install dependencies", style='Dep.TLabel')
+        self.status_label.pack(pady=10)
+
+        self.progress = ttk.Progressbar(main_frame, mode='determinate', style='TProgressbar', length=400)
         self.progress.pack(pady=10)
 
         btn_frame = ttk.Frame(main_frame, style='Dep.TFrame')
@@ -70,7 +79,7 @@ self.progress = ttk.Progressbar(main_frame, mode='determinate', style='TProgress
         cmd_frame.pack(pady=10, fill=tk.X)
 
         self.terminal_cmd = self.get_terminal_command()
-        cmd_entry = ttk.Entry(cmd_frame, font=("Monaco", 11), style='Dep.TEntry')
+        cmd_entry = ttk.Entry(cmd_frame, font=("Monaco", 11))
         cmd_entry.insert(0, self.terminal_cmd)
         cmd_entry.config(state="readonly")
         cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
@@ -92,12 +101,15 @@ self.progress = ttk.Progressbar(main_frame, mode='determinate', style='TProgress
         commands = []
         system = platform.system()
         if "ffmpeg" in self.missing:
-            if system == 'Darwin': commands.append("brew install ffmpeg")
-            elif system == 'Linux': commands.append("sudo apt update && sudo apt install ffmpeg")
-            else: commands.append("winget install -e --id Gyan.FFmpeg")
+            if system == 'Darwin':
+                commands.append("brew install ffmpeg")
+            elif system == 'Linux':
+                commands.append("sudo apt install ffmpeg")
+            else:
+                commands.append("Download from: https://ffmpeg.org/download.html")
         if "model" in self.missing:
-            commands.append("python3 -m reader.download")
-        return " && ".join(commands) or "No command available."
+            commands.append("Models auto-download on first use")
+        return " | ".join(commands) if commands else "No manual steps needed."
 
     def copy_command(self):
         self.clipboard_clear()
@@ -112,36 +124,36 @@ self.progress = ttk.Progressbar(main_frame, mode='determinate', style='TProgress
         try:
             if "ffmpeg" in self.missing and not shutil.which("ffmpeg"):
                 self._download_ffmpeg()
-            if "model" in self.missing and not MODEL_PATH.exists():
+                self.after(0, lambda: self.progress.config(value=50))
+
+            if "model" in self.missing:
                 self._download_model()
+                self.after(0, lambda: self.progress.config(value=100))
+
             self.after(0, self.on_download_complete)
         except Exception as e:
             self.after(0, lambda: self.on_download_error(e))
 
     def _download_ffmpeg(self):
         self.after(0, lambda: self.status_label.config(text="Downloading FFmpeg..."))
-        try:
-            import imageio_ffmpeg
-            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-            ffmpeg_dir = str(Path(ffmpeg_exe).parent)
-            if ffmpeg_dir not in os.environ.get('PATH', ''):
-                 os.environ['PATH'] += os.pathsep + ffmpeg_dir
-            self.after(0, lambda: self.progress.config(value=50))
-        except Exception as e:
-            raise RuntimeError(f"FFmpeg download failed: {e}")
+        import imageio_ffmpeg
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        ffmpeg_dir = str(Path(ffmpeg_exe).parent)
+
+        # Add to current PATH
+        if ffmpeg_dir not in os.environ.get('PATH', ''):
+            os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
+
+        # Save for future sessions
+        config_file = Path.home() / ".audiobook-reader-gui-ffmpeg.conf"
+        config_file.write_text(ffmpeg_dir)
 
     def _download_model(self):
-        self.after(0, lambda: self.status_label.config(text="Downloading model (~100MB)..."))
-        MODEL_URL = "https://github.com/danielcorsano/reader/releases/download/v0.1.15/model.onnx"
-        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        urlretrieve(MODEL_URL, MODEL_PATH, self._progress_hook)
+        self.after(0, lambda: self.status_label.config(text="Downloading Kokoro models (~310MB)..."))
+        from reader.utils.model_downloader import download_models
 
-    def _progress_hook(self, count, block_size, total_size):
-        percent = int(count * block_size * 100 / total_size)
-        # Model is second half of progress bar
-        value = 50 + (percent // 2)
-        self.after(0, lambda: self.progress.config(value=value))
-        self.after(0, lambda: self.status_label.config(text=f"Downloading model... {percent}%"))
+        if not download_models(verbose=False):
+            raise RuntimeError("Model download failed")
 
     def on_download_complete(self):
         self.status_label.config(text="All dependencies are installed!")
@@ -165,6 +177,16 @@ self.progress = ttk.Progressbar(main_frame, mode='determinate', style='TProgress
 
 def run_dependency_check(parent):
     """Run check and show popup if needed. Returns True if dependencies are met."""
+    # Restore FFmpeg PATH from previous session
+    ffmpeg_conf = Path.home() / ".audiobook-reader-gui-ffmpeg.conf"
+    if ffmpeg_conf.exists():
+        try:
+            ffmpeg_dir = ffmpeg_conf.read_text().strip()
+            if ffmpeg_dir and ffmpeg_dir not in os.environ.get('PATH', ''):
+                os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
+        except Exception:
+            pass
+
     # Hide parent window during check
     parent.withdraw()
     missing = check_dependencies()
