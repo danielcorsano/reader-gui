@@ -786,15 +786,8 @@ from reader_gui.dependency_check import run_dependency_check
 
 def main():
     """Entry point."""
-    # Create the main window, but keep it hidden initially
     app = AudiobookReaderGUI()
-    app.withdraw()
-
-    # Run dependency check. It will show a popup if needed and handle quitting.
-    # If dependencies are met, it will show the main window.
     run_dependency_check(app)
-
-    # Start the main event loop
     app.mainloop()
 
 

@@ -11,21 +11,66 @@ import platform
 import os
 
 
+def get_model_locations():
+    """Get possible model locations (package models/ and system cache)."""
+    locations = []
+
+    # Package models/ directory (for development/bundled)
+    try:
+        if getattr(sys, 'frozen', False):
+            # Running as bundled .app
+            base_path = Path(sys._MEIPASS)
+        else:
+            # Running from source
+            base_path = Path(__file__).parent.parent
+
+        package_models = base_path / "models" / "kokoro"
+        if package_models.exists():
+            locations.append(package_models)
+    except Exception:
+        pass
+
+    # System cache (standard location)
+    if platform.system() == "Windows":
+        cache = Path.home() / "AppData/Local/audiobook-reader/models/kokoro"
+    elif platform.system() == "Darwin":
+        cache = Path.home() / "Library/Caches/audiobook-reader/models/kokoro"
+    else:
+        cache = Path.home() / ".cache/audiobook-reader/models/kokoro"
+
+    locations.append(cache)
+    return locations
+
+
 def check_dependencies():
     """Check for ffmpeg and model, return missing dependencies."""
+    # Add common bin directories to PATH first (for bundled .app)
+    common_bins = [
+        "/opt/homebrew/bin",      # Apple Silicon Homebrew
+        "/usr/local/bin",          # Intel Homebrew / Linux default
+        "/opt/local/bin",          # MacPorts
+        "/snap/bin",               # Linux snap
+        str(Path.home() / ".local/bin")  # User local
+    ]
+    for bin_dir in common_bins:
+        if Path(bin_dir).exists() and bin_dir not in os.environ.get('PATH', ''):
+            os.environ['PATH'] = bin_dir + os.pathsep + os.environ.get('PATH', '')
+
     missing = []
+
     if not shutil.which("ffmpeg"):
         missing.append("ffmpeg")
 
-    # Check if reader models exist
-    try:
-        from reader.utils.model_downloader import get_cache_dir
-        cache = get_cache_dir() / "kokoro"
-        model = cache / "kokoro-v1.0.onnx"
-        voices = cache / "voices-v1.0.bin"
-        if not (model.exists() and voices.exists()):
-            missing.append("model")
-    except Exception:
+    # Check if models exist in any location
+    model_found = False
+    for location in get_model_locations():
+        model = location / "kokoro-v1.0.onnx"
+        voices = location / "voices-v1.0.bin"
+        if model.exists() and voices.exists():
+            model_found = True
+            break
+
+    if not model_found:
         missing.append("model")
 
     return missing
@@ -152,6 +197,7 @@ class DependencyPopup(tk.Toplevel):
         self.after(0, lambda: self.status_label.config(text="Downloading Kokoro models (~310MB)..."))
         from reader.utils.model_downloader import download_models
 
+        # Downloads to package models/ if exists (dev), else system cache
         if not download_models(verbose=False):
             raise RuntimeError("Model download failed")
 
@@ -187,11 +233,11 @@ def run_dependency_check(parent):
         except Exception:
             pass
 
-    # Hide parent window during check
-    parent.withdraw()
     missing = check_dependencies()
     if not missing:
         parent.deiconify()
+        parent.lift()
+        parent.focus_force()
         return True
 
     popup = DependencyPopup(parent, missing)
