@@ -2,49 +2,49 @@
 
 Desktop GUI for [audiobook-reader](https://github.com/danielcorsano/reader). Convert ebooks and text files to audiobooks with realistic AI voices up to 8x faster than real-time.
 
+## Download
+
+**[Download latest release](https://github.com/danielcorsano/reader-gui/releases)**
+
+- **macOS**: Download `AudiobookReader-macos.zip`, unzip, run `AudiobookReader.app`
+- **Windows**: Download `AudiobookReader.exe` and run
+- **Linux**: Download `AudiobookReader-linux.tar.gz`, extract, and run
+
+## First Launch
+
+The app checks for required dependencies on startup:
+
+**FFmpeg** (audio encoding):
+- **macOS**: `brew install ffmpeg`
+- **Linux**: `sudo apt install ffmpeg`
+- **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+- Or use the app's automatic download
+
+**Kokoro AI Models** (~310MB): Downloads automatically to system cache
+
 ## Features
 
-- **48 Voices**: Kokoro-82M TTS (8 languages)
-- **Multiple Input Formats**: EPUB, PDF, TXT, Markdown, RST → MP3/WAV/M4A/M4B
+- **48 AI Voices**: Kokoro-82M TTS (8 languages - English, Spanish, French, Italian, Portuguese, Japanese, Chinese, Hindi)
+- **Multiple Formats**: EPUB, PDF, TXT, Markdown, RST → MP3/WAV/M4A/M4B
 - **Character Voices**: Assign different voices to characters with auto-detection
-- **Real-time Progress**: Timeseries visualization with speed graphs and ETA
-- **Audio Preview**: Play output directly from GUI
-- **Clean Design**: Monaco monospace, pure black/yellow theme
-
-## Installation
-
-### Run from Source
-
-Requires Python 3.10-3.13 and the audiobook-reader package in `../reader`.
-
-```bash
-# Clone both repos
-git clone https://github.com/danielcorsano/reader.git
-git clone https://github.com/danielcorsano/reader-gui.git
-
-# Install backend
-cd reader && poetry install && cd ../reader-gui
-
-# Install GUI
-poetry install
-
-# Run
-poetry run python reader_gui/gui.py
-```
+- **Real-time Progress**: Speed charts, ETA, conversion metrics
+- **Audio Preview**: Play output directly from app
+- **Clean Design**: Monaco monospace, black/yellow theme
 
 ## Usage
 
-1. Click "Browse..." to select EPUB, PDF, or text file
+1. Click **Browse** to select EPUB, PDF, or text file
 2. Choose voice (default: am_michael)
 3. Adjust speed (0.5x - 2.0x)
 4. Select output format (MP3/WAV/M4A/M4B)
-5. Optional: Enable character voices (auto-detects `.characters.yaml`)
-6. Click **Convert**
+5. Optional: Enable **Character Voices** for dialogue
+6. Click **Read** to start
 7. Preview audio when complete
 
-## Character Voices
+## Character Voices (Optional)
 
-Create `yourbook.characters.yaml`:
+For books with dialogue, create `yourbook.characters.yaml` next to your ebook:
+
 ```yaml
 characters:
   - name: Alice
@@ -53,19 +53,42 @@ characters:
     voice: am_michael
 ```
 
-Enable "Character Voices" and browse to config, or place next to input file for auto-detection.
+The app auto-detects this file, or browse to it manually.
+
+## Requirements
+
+- **macOS**: 10.15+ (Apple Silicon M1/M2/M3/M4 optimized)
+- **Windows**: Windows 10+
+- **Linux**: Ubuntu 20.04+ or equivalent
+- **FFmpeg**: Required (see First Launch)
 
 ## Development
 
-```bash
-# Run from source
-poetry run python reader_gui/gui.py
+Build from source:
 
-# Build standalone (macOS)
-poetry install --with build
-poetry run python build_scripts/build_macos.py
+```bash
+# Clone repos
+git clone https://github.com/danielcorsano/reader.git
+git clone https://github.com/danielcorsano/reader-gui.git
+
+# Install
+cd reader-gui
+pip install -e ../reader
+pip install -e .
+
+# Run
+python reader_gui/gui.py
+
+# Build standalone app (requires pyinstaller)
+pip install pyinstaller
+python build_scripts/build_macos.py  # or build_windows.py, build_linux.py
 ```
 
 ## License
 
-MIT
+MIT - See [LICENSE](LICENSE)
+
+## Credits
+
+- **TTS**: [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) by hexgrad (Apache 2.0)
+- **Backend**: [audiobook-reader](https://github.com/danielcorsano/reader)
