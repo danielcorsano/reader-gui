@@ -42,24 +42,57 @@ def get_model_locations():
     return locations
 
 
+def check_ffmpeg():
+    """Check if FFmpeg is installed in PATH or common locations."""
+    # Check PATH first
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        return True, ffmpeg_path
+
+    # Check common installation locations
+    common_locations = []
+
+    if platform.system() == "Darwin":  # macOS
+        common_locations = [
+            Path("/opt/homebrew/bin/ffmpeg"),      # Apple Silicon Homebrew
+            Path("/usr/local/bin/ffmpeg"),         # Intel Homebrew
+            Path("/opt/local/bin/ffmpeg"),         # MacPorts
+        ]
+    elif platform.system() == "Windows":
+        common_locations = [
+            Path("C:/Program Files/ffmpeg/bin/ffmpeg.exe"),
+            Path("C:/ffmpeg/bin/ffmpeg.exe"),
+            Path(Path.home() / "scoop/apps/ffmpeg/current/bin/ffmpeg.exe"),
+        ]
+    else:  # Linux
+        common_locations = [
+            Path("/usr/bin/ffmpeg"),
+            Path("/usr/local/bin/ffmpeg"),
+            Path("/snap/bin/ffmpeg"),
+            Path(Path.home() / ".local/bin/ffmpeg"),
+        ]
+
+    # Check each location
+    for path in common_locations:
+        if path.exists():
+            return True, str(path)
+
+    return False, None
+
+
 def check_dependencies():
     """Check for ffmpeg and model, return missing dependencies."""
-    # Add common bin directories to PATH first (for bundled .app)
-    common_bins = [
-        "/opt/homebrew/bin",      # Apple Silicon Homebrew
-        "/usr/local/bin",          # Intel Homebrew / Linux default
-        "/opt/local/bin",          # MacPorts
-        "/snap/bin",               # Linux snap
-        str(Path.home() / ".local/bin")  # User local
-    ]
-    for bin_dir in common_bins:
-        if Path(bin_dir).exists() and bin_dir not in os.environ.get('PATH', ''):
-            os.environ['PATH'] = bin_dir + os.pathsep + os.environ.get('PATH', '')
-
     missing = []
 
-    if not shutil.which("ffmpeg"):
+    # Check FFmpeg and add to PATH if needed
+    ffmpeg_found, ffmpeg_path = check_ffmpeg()
+    if not ffmpeg_found:
         missing.append("ffmpeg")
+    elif ffmpeg_path:
+        # Add to PATH if not already there (for bundled .app)
+        ffmpeg_dir = str(Path(ffmpeg_path).parent)
+        if ffmpeg_dir not in os.environ.get('PATH', ''):
+            os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
 
     # Check if models exist in any location
     model_found = False
