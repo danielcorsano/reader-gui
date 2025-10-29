@@ -139,12 +139,12 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          body_path: RELEASE_NOTES.md
           files: |
             artifacts/macos-build/AudiobookReader-macos.zip
             artifacts/windows-build/AudiobookReader.exe
             artifacts/linux-build/AudiobookReader-linux.tar.gz
           draft: false
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
