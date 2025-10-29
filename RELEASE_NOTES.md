@@ -42,11 +42,6 @@ The app checks for FFmpeg and AI models on startup. If missing, a dialog appears
 6. Click **Read** to start
 7. Preview audio when complete
 
-## Known Issues
-
-- First conversion may take longer due to model caching
-- Large PDFs (>500 pages) require significant RAM
-
 ## Links
 
 - **Documentation**: [README](https://github.com/danielcorsano/reader-gui)
