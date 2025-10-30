@@ -79,6 +79,7 @@ def build_macos():
         "--collect-all=reader",  # Entire reader package
         "--collect-all=kokoro_onnx",
         "--collect-all=onnxruntime",
+        "--collect-all=espeakng_loader",  # espeak-ng phoneme data for Kokoro
         "--collect-all=matplotlib",
         "--collect-all=ttkbootstrap",
         "--collect-all=language_tags",  # Fix for missing JSON data files

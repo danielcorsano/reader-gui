@@ -114,6 +114,7 @@ class AudiobookReaderGUI(ttk.Window):
         # Variables
         self.file_path = tk.StringVar()
         self.output_dir = tk.StringVar(value=str(Path.home() / "Downloads"))
+        self.language_filter = tk.StringVar(value="All")
         self.voice = tk.StringVar(value="am_michael")
         self.speed = tk.DoubleVar(value=1.0)
         self.output_format = tk.StringVar(value="mp3")
@@ -165,9 +166,27 @@ class AudiobookReaderGUI(ttk.Window):
         voice_frame = ttk.LabelFrame(controls_frame, text="Voice", padding=8)
         voice_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
+        # Language filter
+        lang_container = ttk.Frame(voice_frame)
+        lang_container.pack(fill=tk.X, pady=(0, 5))
+
+        ttk.Label(lang_container, text="Language:").pack(side=tk.LEFT, padx=(0, 5))
+        languages = self._get_language_list()
+        lang_combo = ttk.Combobox(lang_container, textvariable=self.language_filter,
+                                  values=languages, state="readonly", width=15)
+        lang_combo.pack(side=tk.LEFT)
+        lang_combo.bind('<<ComboboxSelected>>', self._on_language_change)
+
+        # Voice dropdown with preview button
+        voice_container = ttk.Frame(voice_frame)
+        voice_container.pack(fill=tk.X)
+
         voices = self._get_voice_list()
-        voice_combo = ttk.Combobox(voice_frame, textvariable=self.voice, values=voices, state="readonly")
-        voice_combo.pack(fill=tk.X)
+        self.voice_combo = ttk.Combobox(voice_container, textvariable=self.voice,
+                                        values=voices, state="readonly")
+        self.voice_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+
+        ttk.Button(voice_container, text="Preview", command=self.preview_voice).pack(side=tk.LEFT)
 
         # Speed control
         speed_frame = ttk.LabelFrame(controls_frame, text="Speed", padding=8)
@@ -349,6 +368,115 @@ class AudiobookReaderGUI(ttk.Window):
             return result
         except Exception:
             return ["am_michael (male, en-us)"]
+
+    def _get_language_list(self):
+        """Get list of available languages."""
+        lang_map = {
+            "en-us": "English (US)",
+            "en-gb": "English (UK)",
+            "es": "Spanish",
+            "fr": "French",
+            "it": "Italian",
+            "pt-br": "Portuguese",
+            "ja": "Japanese",
+            "zh": "Chinese",
+            "hi": "Hindi"
+        }
+
+        try:
+            voices = self.reader.list_voices()
+            languages = set()
+            for info in voices.values():
+                lang = info.get('lang', 'unknown')
+                languages.add(lang)
+
+            result = ["All"]
+            for lang in sorted(languages):
+                result.append(lang_map.get(lang, lang))
+
+            return result
+        except Exception:
+            return ["All", "English (US)"]
+
+    def _get_voice_list_filtered(self, language_filter="All"):
+        """Get voices filtered by language."""
+        lang_map_reverse = {
+            "English (US)": "en-us",
+            "English (UK)": "en-gb",
+            "Spanish": "es",
+            "French": "fr",
+            "Italian": "it",
+            "Portuguese": "pt-br",
+            "Japanese": "ja",
+            "Chinese": "zh",
+            "Hindi": "hi"
+        }
+
+        try:
+            voices = self.reader.list_voices()
+            from collections import defaultdict
+            by_language = defaultdict(list)
+
+            target_lang = lang_map_reverse.get(language_filter)
+
+            for vid, info in voices.items():
+                lang = info.get('lang', 'unknown')
+                gender = info.get('gender', 'unknown')
+                name = info.get('name', vid)
+
+                # Filter by language if specified
+                if language_filter != "All" and lang != target_lang:
+                    continue
+
+                by_language[lang].append((name, vid, gender, lang))
+
+            result = []
+            for lang in sorted(by_language.keys()):
+                sorted_voices = sorted(by_language[lang], key=lambda x: x[0])
+                for name, vid, gender, lang in sorted_voices:
+                    result.append(f"{vid} ({gender}, {lang})")
+
+            return result
+        except Exception:
+            return ["am_michael (male, en-us)"]
+
+    def _on_language_change(self, event=None):
+        """Update voice dropdown when language filter changes."""
+        filtered_voices = self._get_voice_list_filtered(self.language_filter.get())
+        self.voice_combo['values'] = filtered_voices
+
+        # If current voice not in filtered list, select first voice
+        if self.voice.get() not in [v.split()[0] for v in filtered_voices]:
+            if filtered_voices:
+                self.voice.set(filtered_voices[0].split()[0])
+
+    def preview_voice(self):
+        """Generate and play preview for selected voice."""
+        voice_selection = self.voice.get()
+        voice_id = voice_selection.split()[0] if voice_selection else "am_michael"
+
+        try:
+            from reader.voices.voice_previewer import get_voice_previewer
+            previewer = get_voice_previewer()
+
+            # Generate preview
+            preview_file = previewer.generate_voice_preview(
+                engine_name='kokoro',
+                voice=voice_id,
+                preview_text=None,
+                output_dir=Path.home() / ".audiobook-reader-gui" / "previews"
+            )
+
+            # Play preview
+            if platform.system() == 'Darwin':
+                subprocess.run(['open', str(preview_file)])
+            elif platform.system() == 'Windows':
+                subprocess.run(['start', str(preview_file)], shell=True)
+            else:
+                subprocess.run(['xdg-open', str(preview_file)])
+
+        except Exception as e:
+            messagebox.showerror("Preview Error", f"Failed to generate voice preview:\n\n{e}")
 
     def browse_file(self):
         """Open file dialog for input file."""
