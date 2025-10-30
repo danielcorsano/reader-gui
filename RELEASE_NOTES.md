@@ -4,7 +4,7 @@ Desktop GUI for [audiobook-reader](https://github.com/danielcorsano/reader). Con
 
 ## Beta Release Notice
 
-First public release. Testing and feedback welcome. Please report issues on GitHub.
+First public release. Testing and feedback welcome, please report issues on GitHub.
 
 ## Downloads
 
