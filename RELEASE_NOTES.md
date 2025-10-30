@@ -30,7 +30,7 @@ First public release. Testing and feedback welcome, please report issues on GitH
 
 ## First Launch
 
-The app checks for FFmpeg and AI models on startup. If missing, a dialog appears with automatic download option or manual installation instructions.
+The app checks for the presence of FFmpeg and voice models on startup. If they are missing, a dialog appears with download buttons. If this is not working for some reason, see README for manual install instructions.
 
 ## Usage
 
