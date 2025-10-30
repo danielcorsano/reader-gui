@@ -79,7 +79,7 @@ def build_windows():
 
     PyInstaller.__main__.run(args)
 
-    print("\n✓ Build complete!")
+    print("\nBuild complete!")
     print(f"Executable: {PROJECT_ROOT}/dist/AudiobookReader.exe")
     print("\nTo test:")
     print("  dist\\AudiobookReader.exe")
