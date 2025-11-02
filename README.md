@@ -84,6 +84,10 @@ pip install pyinstaller
 python build_scripts/build_macos.py  # or build_windows.py, build_linux.py
 ```
 
+## Support
+
+If you like this product, please consider [supporting me](https://github.com/sponsors/danielcorsano). I created it and maintain it alone as a public service. Donations will be used to improve it and to develop requested features.
+
 ## License
 
 MIT - See [LICENSE](LICENSE)

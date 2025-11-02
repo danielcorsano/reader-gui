@@ -42,6 +42,10 @@ The app checks for the presence of FFmpeg and voice models on startup. If they a
 6. Click **Read** to start
 7. Preview audio when complete
 
+## Support
+
+If you like this product, please consider [supporting me](https://github.com/sponsors/danielcorsano). I created it and maintain it alone as a public service. Donations will be used to improve it and to develop requested features.
+
 ## Links
 
 - **Documentation**: [README](https://github.com/danielcorsano/reader-gui)
