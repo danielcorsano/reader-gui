@@ -24,7 +24,7 @@ The app checks for required dependencies on startup:
 
 ## Features
 
-- **48 AI Voices**: Kokoro-82M TTS (8 languages - English, Spanish, French, Italian, Portuguese, Japanese, Chinese, Hindi)
+- **54 AI Voices**: Kokoro-82M TTS (9 languages - American & British English, Spanish, French, Italian, Portuguese, Japanese, Chinese, Hindi)
 - **Multiple Formats**: EPUB, PDF, TXT, Markdown, RST → MP3/WAV/M4A/M4B
 - **Character Voices**: Assign different voices to characters with auto-detection
 - **Real-time Progress**: Speed charts, ETA, conversion metrics
