@@ -243,7 +243,7 @@ class AudiobookReaderGUI(ttk.Window):
         ).pack(anchor=tk.W, padx=8, pady=3)
 
         # Character voices
-        char_frame = ttk.LabelFrame(main_container, text="Character Voices", padding=8)
+        char_frame = ttk.LabelFrame(main_container, text="Character Voices (beta)", padding=8)
         char_frame.pack(fill=tk.X, padx=21, pady=5)
 
         # Enable checkbox and auto-assign button
@@ -252,7 +252,7 @@ class AudiobookReaderGUI(ttk.Window):
 
         ttk.Checkbutton(
             top_row,
-            text="Enable Character Voices",
+            text="Enable Character Voices (beta)",
             variable=self.character_voices_enabled,
             command=self.toggle_character_config
         ).pack(side=tk.LEFT)

@@ -84,6 +84,8 @@ logs/
 CLAUDE.md
 plan/
 .audiobook-reader-gui.conf
+.audiobook-reader-gui-ffmpeg.conf
+.audiobook-reader-gui-models.conf
 
 # Test artifacts (should be in ../reader, not here)
 audio/
