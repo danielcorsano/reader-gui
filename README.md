@@ -1,8 +1,6 @@
-[![Downloads](https://img.shields.io/pypi/dm/audiobook-reader)](https://pypi.org/project/audiobook-reader/)
-
 # Audiobook Reader GUI
 
-Desktop GUI for [audiobook-reader](https://github.com/danielcorsano/reader). Convert ebooks and text files to audiobooks with realistic AI voices up to 8x faster than real-time.
+Desktop GUI for [audiobook-reader](https://github.com/danielcorsano/reader-gui). Convert ebooks and text files to audiobooks with realistic AI voices up to 8x faster than real-time.
 
 ## Download
 
