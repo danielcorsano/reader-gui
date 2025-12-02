@@ -144,14 +144,14 @@ class AudiobookReaderGUI(ttk.Window):
         main_container.pack(fill=tk.BOTH, expand=True)
 
         # File selection
-        file_frame = ttk.LabelFrame(main_container, text="Input File", padding=8)
+        file_frame = ttk.Labelframe(main_container, text="Input File", padding=8)
         file_frame.pack(fill=tk.X, padx=21, pady=(13, 5))
 
         ttk.Entry(file_frame, textvariable=self.file_path).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
         ttk.Button(file_frame, text="Browse...", command=self.browse_file).pack(side=tk.LEFT)
 
         # Output directory
-        output_frame = ttk.LabelFrame(main_container, text="Output Directory", padding=8)
+        output_frame = ttk.Labelframe(main_container, text="Output Directory", padding=8)
         output_frame.pack(fill=tk.X, padx=21, pady=5)
 
         ttk.Entry(output_frame, textvariable=self.output_dir).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
@@ -163,7 +163,7 @@ class AudiobookReaderGUI(ttk.Window):
         controls_frame.pack(fill=tk.X, padx=21, pady=5)
 
         # Voice selection
-        voice_frame = ttk.LabelFrame(controls_frame, text="Voice", padding=8)
+        voice_frame = ttk.Labelframe(controls_frame, text="Voice", padding=8)
         voice_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
         # Language filter
@@ -189,7 +189,7 @@ class AudiobookReaderGUI(ttk.Window):
         ttk.Button(voice_container, text="Preview", command=self.preview_voice).pack(side=tk.LEFT)
 
         # Speed control
-        speed_frame = ttk.LabelFrame(controls_frame, text="Speed", padding=8)
+        speed_frame = ttk.Labelframe(controls_frame, text="Speed", padding=8)
         speed_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
         speed_container = ttk.Frame(speed_frame)
@@ -213,7 +213,7 @@ class AudiobookReaderGUI(ttk.Window):
         options_frame.pack(fill=tk.X, padx=21, pady=5)
 
         # Output format
-        format_frame = ttk.LabelFrame(options_frame, text="Format", padding=8)
+        format_frame = ttk.Labelframe(options_frame, text="Format", padding=8)
         format_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
         formats = ["mp3", "wav", "m4a", "m4b"]
@@ -226,7 +226,7 @@ class AudiobookReaderGUI(ttk.Window):
             ).pack(side=tk.LEFT, padx=8)
 
         # Visualization options
-        viz_frame = ttk.LabelFrame(options_frame, text="Options", padding=8)
+        viz_frame = ttk.Labelframe(options_frame, text="Options", padding=8)
         viz_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
         ttk.Checkbutton(
@@ -243,7 +243,7 @@ class AudiobookReaderGUI(ttk.Window):
         ).pack(anchor=tk.W, padx=8, pady=3)
 
         # Character voices
-        char_frame = ttk.LabelFrame(main_container, text="Character Voices (beta)", padding=8)
+        char_frame = ttk.Labelframe(main_container, text="Character Voices (beta)", padding=8)
         char_frame.pack(fill=tk.X, padx=21, pady=5)
 
         # Enable checkbox and auto-assign button
@@ -285,7 +285,7 @@ class AudiobookReaderGUI(ttk.Window):
         self.char_config_btn.pack(side=tk.LEFT)
 
         # Progress display - fixed height to keep Read button visible
-        progress_frame = ttk.LabelFrame(main_container, text="Progress", padding=8)
+        progress_frame = ttk.Labelframe(main_container, text="Progress", padding=8)
         progress_frame.pack(fill=tk.X, padx=21, pady=5)
 
         # Visualization canvas (hidden by default)

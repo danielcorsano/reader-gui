@@ -284,7 +284,7 @@ class DependencyPopup(tk.Toplevel):
         cancel_btn = ttk.Button(btn_frame, text="Cancel", command=self._on_close, style='Dep.TButton')
         cancel_btn.pack(side=tk.LEFT, padx=5)
 
-        cmd_frame = ttk.LabelFrame(main_frame, text="Alternative: Terminal Command", padding=10, style='Dep.TLabelframe')
+        cmd_frame = ttk.Labelframe(main_frame, text="Alternative: Terminal Command", padding=10, style='Dep.TLabelframe')
         cmd_frame.pack(pady=10, fill=tk.X)
 
         self.terminal_cmd = self.get_terminal_command()

@@ -64,6 +64,11 @@ def build_windows():
         "--collect-all=onnxruntime",
         "--collect-all=matplotlib",
         "--collect-all=ttkbootstrap",
+        "--collect-all=reader",
+        "--collect-all=espeakng_loader",
+        "--collect-all=language_tags",
+        "--collect-all=babel",
+        "--collect-all=ebooklib",
         "--noconfirm",
         "--clean",
     ]
