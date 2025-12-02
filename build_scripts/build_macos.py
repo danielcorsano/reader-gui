@@ -26,6 +26,13 @@ def build_macos():
 
     print(f"✓ Found reader package at {reader_path}")
 
+    # Clean dist directory before building
+    dist_dir = PROJECT_ROOT / "dist"
+    if dist_dir.exists():
+        print(f"Cleaning {dist_dir}...")
+        shutil.rmtree(dist_dir)
+    dist_dir.mkdir(exist_ok=True)
+
     args = [
         str(PROJECT_ROOT / "reader_gui" / "gui.py"),
         "--name=AudiobookReader",

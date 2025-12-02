@@ -116,7 +116,8 @@ class AudiobookReaderGUI(ttk.Window):
         self.output_dir = tk.StringVar(value=str(Path.home() / "Downloads"))
         self.language_filter = tk.StringVar(value="All")
         self.voice = tk.StringVar(value="am_michael")
-        self.speed = tk.DoubleVar(value=1.0)
+        self.speed = tk.DoubleVar(value=1.1)
+        self.speed.trace_add("write", lambda *args: self.update_speed_label())
         self.output_format = tk.StringVar(value="mp3")
         self.character_voices_enabled = tk.BooleanVar(value=False)
         self.character_config_path = tk.StringVar()
@@ -195,15 +196,16 @@ class AudiobookReaderGUI(ttk.Window):
         speed_container = ttk.Frame(speed_frame)
         speed_container.pack(fill=tk.X)
 
-        self.speed_label = ttk.Label(speed_container, text="1.0x")
-        self.speed_label.pack(side=tk.RIGHT)
+        self.speed_entry = ttk.Entry(speed_container, width=6, justify=tk.RIGHT)
+        self.speed_entry.pack(side=tk.RIGHT)
+        self.speed_entry.bind('<Return>', self.on_speed_entry)
+        self.speed_entry.bind('<FocusOut>', self.on_speed_entry)
 
         speed_slider = ttk.Scale(
             speed_container,
             from_=0.5,
             to=2.0,
             variable=self.speed,
-            command=self.update_speed_label,
             orient=tk.HORIZONTAL
         )
         speed_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
@@ -529,9 +531,24 @@ class AudiobookReaderGUI(ttk.Window):
             self.char_config_entry.config(state="disabled")
             self.char_config_btn.config(state="disabled")
 
-    def update_speed_label(self, value):
-        """Update speed display label."""
-        self.speed_label.config(text=f"{float(value):.1f}x")
+    def update_speed_label(self):
+        """Update speed display entry."""
+        value = self.speed.get()
+        self.speed_entry.delete(0, tk.END)
+        self.speed_entry.insert(0, f"{value:.1f}x")
+
+    def on_speed_entry(self, event=None):
+        """Validate and update speed from manual entry."""
+        try:
+            # Get text from entry and remove 'x' suffix if present
+            text = self.speed_entry.get().strip().rstrip('x')
+            value = float(text)
+            # Clamp to valid range
+            value = max(0.5, min(2.0, value))
+            self.speed.set(value)
+        except ValueError:
+            # Reset to current value if invalid
+            self.update_speed_label()
 
     def toggle_conversion(self):
         """Toggle between read and pause."""

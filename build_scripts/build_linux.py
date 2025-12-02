@@ -2,6 +2,7 @@
 
 import PyInstaller.__main__
 import sys
+import shutil
 from pathlib import Path
 
 # Get project root
@@ -10,6 +11,13 @@ ICON_PATH = PROJECT_ROOT / "reader_gui" / "assets" / "icon.png"
 
 def build_linux():
     """Build Linux executable."""
+
+    # Clean dist directory before building
+    dist_dir = PROJECT_ROOT / "dist"
+    if dist_dir.exists():
+        print(f"Cleaning {dist_dir}...")
+        shutil.rmtree(dist_dir)
+    dist_dir.mkdir(exist_ok=True)
 
     args = [
         str(PROJECT_ROOT / "reader_gui" / "gui.py"),
