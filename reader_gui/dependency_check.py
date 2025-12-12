@@ -31,36 +31,6 @@ def augment_path_with_common_locations():
     os.environ['PATH'] = os.pathsep.join(path_parts)
 
 
-def load_shell_path():
-    """Try to load PATH from user's shell config."""
-    if platform.system() != "Darwin" and platform.system() != "Linux":
-        return
-
-    shell_configs = [
-        Path.home() / ".zshrc",
-        Path.home() / ".bash_profile",
-        Path.home() / ".profile",
-    ]
-
-    for config in shell_configs:
-        if not config.exists():
-            continue
-
-        try:
-            # Simple regex to extract PATH exports
-            with open(config, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith('export PATH=') or line.startswith('PATH='):
-                        # Extract paths and add to current PATH
-                        path_value = line.split('=', 1)[1].strip('\'"')
-                        # Replace $PATH reference
-                        if '$PATH' in path_value:
-                            path_value = path_value.replace('$PATH', os.environ.get('PATH', ''))
-                        os.environ['PATH'] = path_value
-                        return
-        except Exception:
-            continue
 
 
 def get_model_locations():
@@ -105,56 +75,36 @@ def get_model_locations():
 
 
 def check_ffmpeg():
-    """Check if FFmpeg is installed in PATH or common locations."""
-    checked_paths = []
+    """Check if FFmpeg is installed using reliable methods."""
 
     # 1. Check FFMPEG_PATH environment variable
     env_path = os.environ.get('FFMPEG_PATH')
     if env_path:
         ffmpeg_bin = Path(env_path)
-        checked_paths.append(env_path)
         if ffmpeg_bin.exists() and _is_executable(ffmpeg_bin):
             return True, str(ffmpeg_bin)
 
-    # 2. Check PATH with shutil.which
+    # 2. Check system PATH with shutil.which
     ffmpeg_path = shutil.which("ffmpeg")
     if ffmpeg_path:
         return True, ffmpeg_path
-    checked_paths.append("PATH")
 
-    # 3. Try subprocess 'which' command (gets shell's PATH)
-    try:
-        result = subprocess.run(['which', 'ffmpeg'], capture_output=True, text=True, timeout=2)
-        if result.returncode == 0 and result.stdout.strip():
-            which_path = result.stdout.strip()
-            if Path(which_path).exists():
-                return True, which_path
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-        pass
-
-    # 4. Query package managers (macOS only)
-    if platform.system() == "Darwin":
-        try:
-            result = subprocess.run(['port', 'contents', 'ffmpeg'],
-                                   capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                for line in result.stdout.splitlines():
-                    if 'bin/ffmpeg' in line and not line.strip().endswith('/'):
-                        pkg_path = Path(line.strip())
-                        if pkg_path.exists() and _is_executable(pkg_path):
-                            return True, str(pkg_path)
-        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-            pass
-
-    # 5. Check common installation locations
+    # 3. Check common installation locations directly
     common_locations = []
 
-    if platform.system() == "Darwin":  # macOS
+    if platform.system() == "Darwin":
         common_locations = [
             Path("/opt/homebrew/bin/ffmpeg"),
             Path("/usr/local/bin/ffmpeg"),
             Path("/opt/local/bin/ffmpeg"),
             Path("/sw/bin/ffmpeg"),
+            Path(Path.home() / ".local/bin/ffmpeg"),
+        ]
+    elif platform.system() == "Linux":
+        common_locations = [
+            Path("/usr/bin/ffmpeg"),
+            Path("/usr/local/bin/ffmpeg"),
+            Path("/snap/bin/ffmpeg"),
             Path(Path.home() / ".local/bin/ffmpeg"),
         ]
     elif platform.system() == "Windows":
@@ -163,23 +113,12 @@ def check_ffmpeg():
             Path("C:/ffmpeg/bin/ffmpeg.exe"),
             Path(Path.home() / "scoop/apps/ffmpeg/current/bin/ffmpeg.exe"),
         ]
-    else:  # Linux
-        common_locations = [
-            Path("/usr/bin/ffmpeg"),
-            Path("/usr/local/bin/ffmpeg"),
-            Path("/snap/bin/ffmpeg"),
-            Path(Path.home() / ".local/bin/ffmpeg"),
-        ]
 
-    # Check each common location
     for path in common_locations:
-        checked_paths.append(str(path))
         if path.exists() and _is_executable(path):
             return True, str(path)
 
-    # Log checked paths only when not found (for debugging)
-    print("FFmpeg not found. Checked:", ", ".join(checked_paths[:5]) + ("..." if len(checked_paths) > 5 else ""))
-
+    # Not found - will trigger dependency popup
     return False, None
 
 
@@ -482,36 +421,41 @@ class DependencyPopup(tk.Toplevel):
 
 def run_dependency_check(parent):
     """Run check and show popup if needed. Returns True if dependencies are met."""
-    # Augment PATH with common package manager locations
-    augment_path_with_common_locations()
+    try:
+        # Augment PATH with common package manager locations
+        augment_path_with_common_locations()
 
-    # Try loading PATH from shell configs
-    load_shell_path()
+        # Restore FFmpeg PATH from previous session
+        ffmpeg_conf = Path.home() / ".audiobook-reader-gui-ffmpeg.conf"
+        if ffmpeg_conf.exists():
+            try:
+                ffmpeg_dir = ffmpeg_conf.read_text().strip()
+                if ffmpeg_dir and ffmpeg_dir not in os.environ.get('PATH', ''):
+                    os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
+            except Exception:
+                pass
 
-    # Restore FFmpeg PATH from previous session
-    ffmpeg_conf = Path.home() / ".audiobook-reader-gui-ffmpeg.conf"
-    if ffmpeg_conf.exists():
-        try:
-            ffmpeg_dir = ffmpeg_conf.read_text().strip()
-            if ffmpeg_dir and ffmpeg_dir not in os.environ.get('PATH', ''):
-                os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
-        except Exception:
-            pass
+        missing = check_dependencies()
+        if not missing:
+            return True
 
-    missing = check_dependencies()
-    if not missing:
-        parent.deiconify()
-        parent.lift()
-        parent.focus_force()
-        return True
+        # Show dependency popup
+        popup = DependencyPopup(parent, missing)
+        parent.wait_window(popup)
 
-    popup = DependencyPopup(parent, missing)
-    parent.wait_window(popup)
+        # After popup, re-check
+        if not check_dependencies():
+            return True
+        else:
+            return False
 
-    # After popup, re-check and decide whether to show main window
-    if not check_dependencies():
-        parent.deiconify()
-        return True
-    else:
-        parent.destroy()
-        sys.exit(0)
+    except Exception as e:
+        # Show error in messagebox
+        import traceback
+        messagebox.showerror(
+            "Dependency Check Error",
+            f"Error during dependency check:\n\n{str(e)}\n\n"
+            "Please report this issue with the error details.\n\n"
+            f"Details:\n{traceback.format_exc()}"
+        )
+        return False

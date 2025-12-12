@@ -136,7 +136,6 @@ class AudiobookReaderGUI(ttk.Window):
 
         self.setup_ui()
         self._center_window()
-        self._process_queue()
 
     def setup_ui(self):
         """Build the interface."""
@@ -931,9 +930,42 @@ from reader_gui.dependency_check import run_dependency_check
 
 def main():
     """Entry point."""
-    app = AudiobookReaderGUI()
-    run_dependency_check(app)
-    app.mainloop()
+    try:
+        app = AudiobookReaderGUI()
+        app.withdraw()  # Hide window initially
+
+        # Check dependencies before showing window
+        deps_ok = run_dependency_check(app)
+        if not deps_ok:
+            sys.exit(1)
+
+        # Show window and start queue processing
+        app.deiconify()
+        app.lift()
+        app.focus_force()
+        app._process_queue()
+        app.mainloop()
+
+    except Exception as e:
+        # Last resort error handling
+        try:
+            import traceback
+            error_msg = f"Fatal startup error:\n\n{traceback.format_exc()}"
+
+            # Try GUI messagebox first
+            try:
+                import tkinter as tk
+                from tkinter import messagebox
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showerror("Startup Error", error_msg)
+                root.destroy()
+            except:
+                # Fall back to console
+                print(error_msg, file=sys.stderr)
+        except:
+            pass
+        sys.exit(1)
 
 
 

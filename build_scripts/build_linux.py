@@ -12,6 +12,15 @@ ICON_PATH = PROJECT_ROOT / "reader_gui" / "assets" / "icon.png"
 def build_linux():
     """Build Linux executable."""
 
+    # Check that reader package exists
+    reader_path = PROJECT_ROOT.parent / "reader"
+    if not reader_path.exists():
+        print(f"\n❌ ERROR: Reader package not found at {reader_path}")
+        print("   Make sure the reader package is in ../reader/")
+        sys.exit(1)
+
+    print(f"✓ Found reader package at {reader_path}")
+
     # Clean dist directory before building
     dist_dir = PROJECT_ROOT / "dist"
     if dist_dir.exists():
@@ -22,9 +31,10 @@ def build_linux():
     args = [
         str(PROJECT_ROOT / "reader_gui" / "gui.py"),
         "--name=audiobook-reader-gui",
-        "--onefile",
+        "--onedir",
         f"--icon={ICON_PATH}" if ICON_PATH.exists() else "",
         "--add-data=reader_gui/assets:reader_gui/assets",
+        f"--paths={reader_path}",
         # Reader backend package
         "--hidden-import=reader",
         "--hidden-import=reader.cli",
@@ -76,6 +86,8 @@ def build_linux():
         "--collect-all=language_tags",
         "--collect-all=babel",
         "--collect-all=ebooklib",
+        "--collect-all=tkinter",
+        "--collect-all=_tkinter",
         "--noconfirm",
         "--clean",
     ]
@@ -92,9 +104,10 @@ def build_linux():
     PyInstaller.__main__.run(args)
 
     print("\n✓ Build complete!")
-    print(f"Executable: {PROJECT_ROOT}/dist/audiobook-reader-gui")
+    print(f"Application bundle: {PROJECT_ROOT}/dist/audiobook-reader-gui/")
+    print(f"Executable: {PROJECT_ROOT}/dist/audiobook-reader-gui/audiobook-reader-gui")
     print("\nTo test:")
-    print("  ./dist/audiobook-reader-gui")
+    print("  ./dist/audiobook-reader-gui/audiobook-reader-gui")
     print("\nTo create AppImage:")
     print("  See: https://appimage.org/")
 
