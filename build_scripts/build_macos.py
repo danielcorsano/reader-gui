@@ -5,6 +5,7 @@ import sys
 import os
 from pathlib import Path
 import shutil
+import subprocess
 
 # Get project root
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -110,8 +111,36 @@ def build_macos():
 
     print("\n✓ Build complete!")
     print(f"Application: {PROJECT_ROOT}/dist/AudiobookReader.app")
+
+    # Create DMG for distribution
+    print("\nCreating DMG for distribution...")
+    dmg_path = PROJECT_ROOT / "dist" / "AudiobookReader.dmg"
+    app_path = PROJECT_ROOT / "dist" / "AudiobookReader.app"
+
+    # Remove old DMG if exists
+    if dmg_path.exists():
+        dmg_path.unlink()
+
+    # Create DMG using hdiutil
+    try:
+        subprocess.run([
+            "hdiutil", "create",
+            "-volname", "AudiobookReader",
+            "-srcfolder", str(app_path),
+            "-ov",
+            "-format", "UDZO",
+            str(dmg_path)
+        ], check=True)
+        print(f"\n✓ DMG created: {dmg_path}")
+        print(f"  Size: {dmg_path.stat().st_size / (1024*1024):.1f} MB")
+    except subprocess.CalledProcessError as e:
+        print(f"\n⚠ Warning: Failed to create DMG: {e}")
+        print("  The .app file is still available for distribution")
+
     print("\nTo test:")
     print("  open dist/AudiobookReader.app")
+    print("\nTo distribute:")
+    print("  Upload dist/AudiobookReader.dmg to GitHub releases")
 
 if __name__ == "__main__":
     build_macos()

@@ -421,6 +421,8 @@ class DependencyPopup(tk.Toplevel):
 
 def run_dependency_check(parent):
     """Run check and show popup if needed. Returns True if dependencies are met."""
+    import traceback
+
     try:
         # Augment PATH with common package manager locations
         augment_path_with_common_locations()
@@ -432,16 +434,34 @@ def run_dependency_check(parent):
                 ffmpeg_dir = ffmpeg_conf.read_text().strip()
                 if ffmpeg_dir and ffmpeg_dir not in os.environ.get('PATH', ''):
                     os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Warning: Failed to restore FFmpeg PATH: {e}", file=sys.stderr)
 
         missing = check_dependencies()
         if not missing:
             return True
 
-        # Show dependency popup
-        popup = DependencyPopup(parent, missing)
-        parent.wait_window(popup)
+        # Show dependency popup with error handling
+        try:
+            popup = DependencyPopup(parent, missing)
+            parent.wait_window(popup)
+        except Exception as popup_error:
+            # If popup fails, show simple messagebox instead
+            error_details = traceback.format_exc()
+            print(f"ERROR: Dependency popup failed:\n{error_details}", file=sys.stderr)
+
+            result = messagebox.askokcancel(
+                "Missing Dependencies",
+                f"Missing: {', '.join(missing)}\n\n"
+                f"The dependency installer failed to load.\n\n"
+                f"Please install manually:\n"
+                f"- FFmpeg: brew install ffmpeg (macOS)\n"
+                f"- Models will auto-download on first use\n\n"
+                f"Error: {str(popup_error)}\n\n"
+                f"Continue anyway?",
+                parent=parent
+            )
+            return result if result else False
 
         # After popup, re-check
         if not check_dependencies():
@@ -451,11 +471,13 @@ def run_dependency_check(parent):
 
     except Exception as e:
         # Show error in messagebox
-        import traceback
+        error_details = traceback.format_exc()
+        print(f"ERROR: Dependency check failed:\n{error_details}", file=sys.stderr)
+
         messagebox.showerror(
             "Dependency Check Error",
             f"Error during dependency check:\n\n{str(e)}\n\n"
-            "Please report this issue with the error details.\n\n"
-            f"Details:\n{traceback.format_exc()}"
+            "Run from terminal to see full error:\n"
+            "/Applications/AudiobookReader.app/Contents/MacOS/AudiobookReader"
         )
         return False
