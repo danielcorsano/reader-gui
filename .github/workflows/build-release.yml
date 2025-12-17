@@ -34,16 +34,11 @@ jobs:
       - name: Build macOS app
         run: poetry run python build_scripts/build_macos.py
 
-      - name: Create ZIP archive
-        run: |
-          cd dist
-          zip -r AudiobookReader-macos.zip AudiobookReader.app
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-build
-          path: dist/AudiobookReader-macos.zip
+          path: dist/AudiobookReader.dmg
 
   build-windows:
     runs-on: windows-latest
@@ -141,7 +136,7 @@ jobs:
         with:
           body_path: RELEASE_NOTES.md
           files: |
-            artifacts/macos-build/AudiobookReader-macos.zip
+            artifacts/macos-build/AudiobookReader.dmg
             artifacts/windows-build/AudiobookReader.exe
             artifacts/linux-build/AudiobookReader-linux.tar.gz
           draft: false
