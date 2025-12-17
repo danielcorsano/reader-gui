@@ -969,10 +969,8 @@ def main():
         app = AudiobookReaderGUI()
         logger.log("GUI instance created")
 
-        app.withdraw()  # Hide window initially
-        logger.log("Window hidden, checking dependencies...")
-
-        # Check dependencies before showing window
+        # Check dependencies BEFORE hiding window (dependency popup needs visible parent)
+        logger.log("Checking dependencies...")
         deps_ok = run_dependency_check(app)
         if not deps_ok:
             logger.log("Dependency check failed, exiting", "ERROR")
@@ -981,7 +979,6 @@ def main():
         logger.log("Dependencies OK, showing window...")
 
         # Show window and start queue processing
-        app.deiconify()
         app.lift()
         app.focus_force()
         logger.log("Starting event loop...")
