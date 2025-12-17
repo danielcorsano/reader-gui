@@ -7,12 +7,16 @@ from datetime import datetime
 import platform
 import os
 
+from reader_gui.app_dirs import get_app_log_dir
+
 
 class StartupLogger:
     """Log all startup activities to file and display errors."""
 
     def __init__(self):
-        self.log_file = Path.home() / ".audiobook-reader-gui-startup.log"
+        # Use proper platform-specific log directory
+        log_dir = get_app_log_dir()
+        self.log_file = log_dir / "startup.log"
         self.errors = []
 
         # Start fresh log for this session

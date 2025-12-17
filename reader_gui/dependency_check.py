@@ -11,6 +11,8 @@ import platform
 import os
 import subprocess
 
+from reader_gui.app_dirs import get_app_config_dir
+
 
 def augment_path_with_common_locations():
     """Add common package manager locations to PATH for .app environment."""
@@ -38,7 +40,7 @@ def get_model_locations():
     locations = []
 
     # Check for manually specified model path
-    config_file = Path.home() / ".audiobook-reader-gui-models.conf"
+    config_file = get_app_config_dir() / "models_path.conf"
     if config_file.exists():
         try:
             models_path = Path(config_file.read_text().strip())
@@ -298,7 +300,7 @@ class DependencyPopup(tk.Toplevel):
                 ffmpeg_dir = str(ffmpeg_path.parent)
                 os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
 
-                config_file = Path.home() / ".audiobook-reader-gui-ffmpeg.conf"
+                config_file = get_app_config_dir() / "ffmpeg_path.conf"
                 config_file.write_text(ffmpeg_dir)
 
                 # Remove ffmpeg from missing
@@ -340,7 +342,7 @@ class DependencyPopup(tk.Toplevel):
 
         if model_file.exists() and voices_file.exists():
             # Save to config
-            config_file = Path.home() / ".audiobook-reader-gui-models.conf"
+            config_file = get_app_config_dir() / "models_path.conf"
             config_file.write_text(str(models_path))
 
             # Remove model from missing
@@ -388,7 +390,7 @@ class DependencyPopup(tk.Toplevel):
             os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
 
         # Save for future sessions
-        config_file = Path.home() / ".audiobook-reader-gui-ffmpeg.conf"
+        config_file = get_app_config_dir() / "ffmpeg_path.conf"
         config_file.write_text(ffmpeg_dir)
 
     def _download_model(self):
@@ -447,7 +449,7 @@ def run_dependency_check(parent):
         augment_path_with_common_locations()
 
         # Restore FFmpeg PATH from previous session
-        ffmpeg_conf = Path.home() / ".audiobook-reader-gui-ffmpeg.conf"
+        ffmpeg_conf = get_app_config_dir() / "ffmpeg_path.conf"
         if ffmpeg_conf.exists():
             try:
                 ffmpeg_dir = ffmpeg_conf.read_text().strip()

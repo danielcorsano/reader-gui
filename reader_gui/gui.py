@@ -13,6 +13,7 @@ from collections import defaultdict
 
 from reader_gui.startup_diagnostics import logger, run_startup_diagnostics, show_diagnostic_error
 from reader_gui.dependency_check import run_dependency_check
+from reader_gui.app_dirs import get_app_config_dir, get_app_cache_dir
 
 
 class AudiobookReaderGUI(ttk.Window):
@@ -472,7 +473,7 @@ class AudiobookReaderGUI(ttk.Window):
                 engine_name='kokoro',
                 voice=voice_id,
                 preview_text=None,
-                output_dir=Path.home() / ".audiobook-reader-gui" / "previews"
+                output_dir=get_app_cache_dir() / "previews"
             )
 
             # Play preview
@@ -816,7 +817,7 @@ class AudiobookReaderGUI(ttk.Window):
 
     def _load_last_directory(self):
         """Load last used directory from config."""
-        config_file = Path.home() / ".audiobook-reader-gui.conf"
+        config_file = get_app_config_dir() / "last_directory.conf"
         if config_file.exists():
             try:
                 last_dir = config_file.read_text().strip()
@@ -827,7 +828,7 @@ class AudiobookReaderGUI(ttk.Window):
 
     def _save_last_directory(self):
         """Save last used directory to config."""
-        config_file = Path.home() / ".audiobook-reader-gui.conf"
+        config_file = get_app_config_dir() / "last_directory.conf"
         try:
             config_file.write_text(self.output_dir.get())
         except Exception:
