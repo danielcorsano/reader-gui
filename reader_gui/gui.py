@@ -8,6 +8,11 @@ from pathlib import Path
 import queue
 import platform
 import subprocess
+import traceback
+from collections import defaultdict
+
+from reader_gui.startup_diagnostics import logger, run_startup_diagnostics, show_diagnostic_error
+from reader_gui.dependency_check import run_dependency_check
 
 
 class AudiobookReaderGUI(ttk.Window):
@@ -105,10 +110,14 @@ class AudiobookReaderGUI(ttk.Window):
 
         # Initialize reader
         try:
+            logger.log("Importing Reader class...")
             from reader import Reader
+            logger.log("Creating Reader instance...")
             self.reader = Reader()
+            logger.log(f"Reader initialized successfully")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to initialize reader: {e}")
+            logger.log_exception(e, "Reader initialization")
+            messagebox.showerror("Error", f"Failed to initialize reader: {e}\n\nCheck log: {logger.log_file}")
             sys.exit(1)
 
         # Variables
@@ -349,7 +358,6 @@ class AudiobookReaderGUI(ttk.Window):
             voices = self.reader.list_voices()
 
             # Group voices by language
-            from collections import defaultdict
             by_language = defaultdict(list)
 
             for vid, info in voices.items():
@@ -415,7 +423,6 @@ class AudiobookReaderGUI(ttk.Window):
 
         try:
             voices = self.reader.list_voices()
-            from collections import defaultdict
             by_language = defaultdict(list)
 
             target_lang = lang_map_reverse.get(language_filter)
@@ -925,46 +932,197 @@ class AudiobookReaderGUI(ttk.Window):
             self.progress_text.master.pack(fill=tk.X)
 
 
-from reader_gui.dependency_check import run_dependency_check
-
-
 def main():
-    """Entry point."""
+    """Entry point with comprehensive diagnostics."""
+    logger.log("=== Application starting ===")
+
     try:
+        # Run startup diagnostics first
+        logger.log("Running startup diagnostics...")
+        diagnostic_issues = run_startup_diagnostics()
+
+        if diagnostic_issues:
+            logger.log(f"Found {len(diagnostic_issues)} diagnostic issues", "ERROR")
+            for issue in diagnostic_issues:
+                logger.log(f"  - {issue}", "ERROR")
+
+            # Show diagnostic window for CRITICAL errors only
+            # (FFmpeg/model missing are handled separately by dependency_check)
+            critical_errors = [i for i in diagnostic_issues if not any(x in i.lower() for x in ['ffmpeg', 'model'])]
+
+            if critical_errors:
+                logger.log("Critical errors detected, showing diagnostic window")
+                try:
+                    show_diagnostic_error()
+                except Exception as e:
+                    logger.log_exception(e, "show_diagnostic_error")
+                    # Continue anyway
+            else:
+                logger.log("Only non-critical issues (dependencies), will be handled by dependency_check")
+
+        logger.log("Creating GUI instance...")
         app = AudiobookReaderGUI()
+        logger.log("GUI instance created")
+
         app.withdraw()  # Hide window initially
+        logger.log("Window hidden, checking dependencies...")
 
         # Check dependencies before showing window
         deps_ok = run_dependency_check(app)
         if not deps_ok:
+            logger.log("Dependency check failed, exiting", "ERROR")
             sys.exit(1)
+
+        logger.log("Dependencies OK, showing window...")
 
         # Show window and start queue processing
         app.deiconify()
         app.lift()
         app.focus_force()
+        logger.log("Starting event loop...")
         app._process_queue()
+        logger.log("Entering mainloop")
         app.mainloop()
+        logger.log("Mainloop exited normally")
+
+    except KeyboardInterrupt:
+        logger.log("Interrupted by user (Ctrl+C)")
+        sys.exit(0)
 
     except Exception as e:
-        # Last resort error handling
+        # Last resort error handling with full diagnostics
+        logger.log_exception(e, "main()")
+
         try:
-            import traceback
-            error_msg = f"Fatal startup error:\n\n{traceback.format_exc()}"
+            error_msg = f"Fatal startup error:\n\n{traceback.format_exc()}\n\nLog file: {logger.log_file}"
+
+            logger.log(f"Attempting to show error dialog", "ERROR")
 
             # Try GUI messagebox first
             try:
-                import tkinter as tk
-                from tkinter import messagebox
-                root = tk.Tk()
-                root.withdraw()
-                messagebox.showerror("Startup Error", error_msg)
-                root.destroy()
+                from tkinter import scrolledtext
+
+                error_root = tk.Tk()
+                error_root.title("Fatal Error - Audiobook Reader")
+                error_root.geometry("800x600")
+                error_root.configure(bg="#000000")
+
+                # Error header
+                header = tk.Label(
+                    error_root,
+                    text="Fatal Startup Error",
+                    bg="#000000",
+                    fg="#FF0000",
+                    font=("Monaco", 16, "bold"),
+                    pady=20
+                )
+                header.pack()
+
+                # Error details
+                text_frame = tk.Frame(error_root, bg="#000000")
+                text_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+                error_text = scrolledtext.ScrolledText(
+                    text_frame,
+                    bg="#000000",
+                    fg="#FFD700",
+                    font=("Monaco", 10),
+                    wrap=tk.WORD
+                )
+                error_text.pack(fill=tk.BOTH, expand=True)
+
+                # Show error + log
+                error_text.insert("1.0", "=== ERROR ===\n\n")
+                error_text.insert(tk.END, error_msg)
+                error_text.insert(tk.END, "\n\n=== FULL STARTUP LOG ===\n\n")
+                try:
+                    with open(logger.log_file, 'r') as f:
+                        error_text.insert(tk.END, f.read())
+                except:
+                    error_text.insert(tk.END, "[Could not read log file]")
+
+                error_text.config(state=tk.DISABLED)
+
+                # Buttons
+                btn_frame = tk.Frame(error_root, bg="#000000", pady=20)
+                btn_frame.pack()
+
+                def copy_error():
+                    error_root.clipboard_clear()
+                    error_root.clipboard_append(error_msg)
+
+                def open_log():
+                    try:
+                        if platform.system() == 'Darwin':
+                            subprocess.run(['open', '-t', str(logger.log_file)])
+                        elif platform.system() == 'Windows':
+                            subprocess.run(['notepad', str(logger.log_file)])
+                        else:
+                            subprocess.run(['xdg-open', str(logger.log_file)])
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Could not open log: {e}")
+
+                tk.Button(
+                    btn_frame,
+                    text="Copy Error",
+                    command=copy_error,
+                    bg="#FFD700",
+                    fg="#000000",
+                    font=("Monaco", 11)
+                ).pack(side=tk.LEFT, padx=5)
+
+                tk.Button(
+                    btn_frame,
+                    text="Open Log File",
+                    command=open_log,
+                    bg="#FFD700",
+                    fg="#000000",
+                    font=("Monaco", 11)
+                ).pack(side=tk.LEFT, padx=5)
+
+                tk.Button(
+                    btn_frame,
+                    text="Exit",
+                    command=error_root.destroy,
+                    bg="#FFD700",
+                    fg="#000000",
+                    font=("Monaco", 11)
+                ).pack(side=tk.LEFT, padx=5)
+
+                error_root.mainloop()
+
+            except Exception as gui_error:
+                # GUI failed, fall back to console
+                try:
+                    logger.log_exception(gui_error, "error dialog display")
+                    logger.log("GUI error dialog failed, printing to stderr", "ERROR")
+                except:
+                    pass
+
+                # Print to stderr as last resort
+                error_output = (
+                    "\n" + "=" * 80 + "\n"
+                    "FATAL ERROR - Could not display GUI\n"
+                    f"{'=' * 80}\n"
+                    f"{error_msg}\n"
+                    f"\n{'=' * 80}\n"
+                    f"Full log available at: {logger.log_file}\n"
+                    f"{'=' * 80}\n"
+                )
+                print(error_output, file=sys.stderr)
+
+        except Exception as final_error:
+            # Even error handling failed - last resort
+            try:
+                logger.log(f"CATASTROPHIC ERROR: {final_error}", "ERROR")
+                logger.log(f"Original error: {e}", "ERROR")
             except:
-                # Fall back to console
-                print(error_msg, file=sys.stderr)
-        except:
-            pass
+                pass
+
+            print(f"\n\nCATASTROPHIC ERROR: {final_error}", file=sys.stderr)
+            print(f"Original error: {e}", file=sys.stderr)
+            print(f"See log: {logger.log_file}", file=sys.stderr)
+
         sys.exit(1)
 
 

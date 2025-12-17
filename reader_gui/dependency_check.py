@@ -172,8 +172,17 @@ class DependencyPopup(tk.Toplevel):
         self.parent = parent
         self.permanent_models = tk.BooleanVar(value=True)
 
-        # Consistent styling
-        style = ttk.Style()
+        # CRITICAL: Get style from parent window - DON'T create new Style() instance
+        # Creating multiple ttk.Style() instances causes blank/empty windows in tkinter
+        # ttkbootstrap.Window already has a Style, so we reuse it
+        if hasattr(parent, 'style'):
+            # Parent is ttkbootstrap.Window with style attribute
+            style = parent.style
+        else:
+            # Fallback: get default style (shares instance across app)
+            style = ttk.Style()
+
+        # Configure dependency popup styles using parent's theme
         style.configure('Dep.TFrame', background='#000000')
         style.configure('Dep.TLabel', background='#000000', foreground='#FFD700', font=("Monaco", 13))
         style.configure('Dep.TButton', background='#FFD700', foreground='#000000', font=("Monaco", 13), padding=(10, 5))
@@ -227,7 +236,10 @@ class DependencyPopup(tk.Toplevel):
         cmd_frame.pack(pady=10, fill=tk.X)
 
         self.terminal_cmd = self.get_terminal_command()
-        cmd_entry = ttk.Entry(cmd_frame, font=("Monaco", 11))
+
+        # Configure Entry style with font (safer than passing font directly)
+        style.configure('Cmd.TEntry', font=("Monaco", 11))
+        cmd_entry = ttk.Entry(cmd_frame, style='Cmd.TEntry')
         cmd_entry.insert(0, self.terminal_cmd)
         cmd_entry.config(state="readonly")
         cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
@@ -424,6 +436,13 @@ def run_dependency_check(parent):
     import traceback
 
     try:
+        from reader_gui.startup_diagnostics import logger
+    except:
+        logger = None
+
+    try:
+        if logger:
+            logger.log("Augmenting PATH with common locations...")
         # Augment PATH with common package manager locations
         augment_path_with_common_locations()
 
@@ -432,22 +451,38 @@ def run_dependency_check(parent):
         if ffmpeg_conf.exists():
             try:
                 ffmpeg_dir = ffmpeg_conf.read_text().strip()
+                if logger:
+                    logger.log(f"Restoring FFmpeg PATH from config: {ffmpeg_dir}")
                 if ffmpeg_dir and ffmpeg_dir not in os.environ.get('PATH', ''):
                     os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
             except Exception as e:
+                if logger:
+                    logger.log(f"Failed to restore FFmpeg PATH: {e}", "WARN")
                 print(f"Warning: Failed to restore FFmpeg PATH: {e}", file=sys.stderr)
 
+        if logger:
+            logger.log("Checking dependencies...")
         missing = check_dependencies()
+
         if not missing:
+            if logger:
+                logger.log("All dependencies satisfied")
             return True
 
+        if logger:
+            logger.log(f"Missing dependencies: {missing}", "WARN")
+
         # Show dependency popup with error handling
+        if logger:
+            logger.log("Showing dependency popup...")
         try:
             popup = DependencyPopup(parent, missing)
             parent.wait_window(popup)
         except Exception as popup_error:
             # If popup fails, show simple messagebox instead
             error_details = traceback.format_exc()
+            if logger:
+                logger.log_exception(popup_error, "dependency popup")
             print(f"ERROR: Dependency popup failed:\n{error_details}", file=sys.stderr)
 
             result = messagebox.askokcancel(
@@ -464,20 +499,30 @@ def run_dependency_check(parent):
             return result if result else False
 
         # After popup, re-check
+        if logger:
+            logger.log("Re-checking dependencies after popup...")
         if not check_dependencies():
+            if logger:
+                logger.log("Dependencies now satisfied")
             return True
         else:
+            if logger:
+                logger.log("Dependencies still missing", "WARN")
             return False
 
     except Exception as e:
         # Show error in messagebox
         error_details = traceback.format_exc()
+        if logger:
+            logger.log_exception(e, "run_dependency_check")
         print(f"ERROR: Dependency check failed:\n{error_details}", file=sys.stderr)
 
         messagebox.showerror(
             "Dependency Check Error",
             f"Error during dependency check:\n\n{str(e)}\n\n"
-            "Run from terminal to see full error:\n"
+            "Check log file:\n"
+            "~/.audiobook-reader-gui-startup.log\n\n"
+            "Or run from terminal:\n"
             "/Applications/AudiobookReader.app/Contents/MacOS/AudiobookReader"
         )
         return False

@@ -1,10 +1,10 @@
-# Audiobook Reader v0.3.1
+# Audiobook Reader v0.3.5
 
 See [CHANGELOG](https://github.com/danielcorsano/reader-gui/blob/main/CHANGELOG.md) for version history.
 
 ## Downloads
 
-- **macOS**: `AudiobookReader.zip` - Unzip and run
+- **macOS**: `AudiobookReader.dmg` - Download and mount
 - **Windows**: `AudiobookReader.exe` - Download and run
 - **Linux**: `AudiobookReader-linux.tar.gz` - Extract and run
 
