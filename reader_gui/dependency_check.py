@@ -519,11 +519,16 @@ def run_dependency_check(parent):
             logger.log_exception(e, "run_dependency_check")
         print(f"ERROR: Dependency check failed:\n{error_details}", file=sys.stderr)
 
+        try:
+            from reader_gui.startup_diagnostics import logger
+            log_path = logger.get_log_path_display()
+        except:
+            log_path = "See application logs directory"
+
         messagebox.showerror(
             "Dependency Check Error",
             f"Error during dependency check:\n\n{str(e)}\n\n"
-            "Check log file:\n"
-            "~/.audiobook-reader-gui-startup.log\n\n"
+            f"Check startup log:\n{log_path}\n\n"
             "Or run from terminal:\n"
             "/Applications/AudiobookReader.app/Contents/MacOS/AudiobookReader"
         )

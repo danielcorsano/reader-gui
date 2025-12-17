@@ -118,7 +118,11 @@ class AudiobookReaderGUI(ttk.Window):
             logger.log(f"Reader initialized successfully")
         except Exception as e:
             logger.log_exception(e, "Reader initialization")
-            messagebox.showerror("Error", f"Failed to initialize reader: {e}\n\nCheck log: {logger.log_file}")
+            messagebox.showerror(
+                "Startup Error",
+                f"Failed to initialize reader:\n\n{e}\n\n"
+                f"Check startup log for details:\n{logger.get_log_path_display()}"
+            )
             sys.exit(1)
 
         # Variables
@@ -995,7 +999,10 @@ def main():
         logger.log_exception(e, "main()")
 
         try:
-            error_msg = f"Fatal startup error:\n\n{traceback.format_exc()}\n\nLog file: {logger.log_file}"
+            error_msg = (
+                f"Fatal startup error:\n\n{traceback.format_exc()}\n\n"
+                f"Startup log: {logger.get_log_path_display()}"
+            )
 
             logger.log(f"Attempting to show error dialog", "ERROR")
 
@@ -1107,7 +1114,7 @@ def main():
                     f"{'=' * 80}\n"
                     f"{error_msg}\n"
                     f"\n{'=' * 80}\n"
-                    f"Full log available at: {logger.log_file}\n"
+                    f"Startup log: {logger.get_log_path_display()}\n"
                     f"{'=' * 80}\n"
                 )
                 print(error_output, file=sys.stderr)
@@ -1122,7 +1129,7 @@ def main():
 
             print(f"\n\nCATASTROPHIC ERROR: {final_error}", file=sys.stderr)
             print(f"Original error: {e}", file=sys.stderr)
-            print(f"See log: {logger.log_file}", file=sys.stderr)
+            print(f"Startup log: {logger.get_log_path_display()}", file=sys.stderr)
 
         sys.exit(1)
 

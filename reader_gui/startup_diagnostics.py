@@ -60,6 +60,16 @@ class StartupLogger:
         """Return all logged errors."""
         return self.errors
 
+    def get_log_path_display(self):
+        """Get user-friendly log path for display."""
+        try:
+            # Try to make path relative to home for cleaner display
+            rel_path = self.log_file.relative_to(Path.home())
+            return f"~/{rel_path}"
+        except ValueError:
+            # Path not relative to home, return as-is
+            return str(self.log_file)
+
 
 # Global logger instance
 logger = StartupLogger()
@@ -258,7 +268,7 @@ def show_diagnostic_error(parent=None):
 
     tk.Label(
         btn_frame,
-        text=f"Full log: {logger.log_file}",
+        text=f"Log: {logger.get_log_path_display()}",
         bg="#000000",
         fg="#888888",
         font=("Monaco", 10)
