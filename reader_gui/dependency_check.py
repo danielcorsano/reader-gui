@@ -253,8 +253,8 @@ class DependencyPopup(tk.Toplevel):
 
     def center_window(self):
         self.update_idletasks()
-        width = 550
-        height = 350
+        width = 700
+        height = 400
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f'{width}x{height}+{x}+{y}')

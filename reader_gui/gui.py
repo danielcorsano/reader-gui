@@ -27,8 +27,9 @@ class AudiobookReaderGUI(ttk.Window):
             resizable=(True, True)
         )
 
-        # Customize theme to match convertext-gui (black/yellow Monaco)
-        style = ttk.Style()
+        # Customize theme - use existing style from ttkbootstrap.Window
+        # DO NOT create new ttk.Style() - causes conflicts with Toplevel windows
+        style = self.style
 
         # Base styles
         style.configure('TFrame', background='#000000')
