@@ -52,8 +52,8 @@ def get_model_locations():
     # Package models/ directory (for development/bundled)
     try:
         if getattr(sys, 'frozen', False):
-            # Running as bundled .app
-            base_path = Path(sys._MEIPASS)
+            # Running as bundled .app - check Application Support directory
+            base_path = get_app_config_dir().parent
         else:
             # Running from source
             base_path = Path(__file__).parent.parent
@@ -345,6 +345,9 @@ class DependencyPopup(tk.Toplevel):
             config_file = get_app_config_dir() / "models_path.conf"
             config_file.write_text(str(models_path))
 
+            # Set environment variable for reader backend
+            os.environ['AUDIOBOOK_READER_MODELS_DIR'] = str(models_path)
+
             # Remove model from missing
             if "model" in self.missing:
                 self.missing.remove("model")
@@ -400,18 +403,25 @@ class DependencyPopup(tk.Toplevel):
         # Determine target directory based on user preference
         target_dir = None
         if self.permanent_models.get():
-            # Download to app directory (permanent)
+            # Download to Application Support (permanent)
             if getattr(sys, 'frozen', False):
-                # Bundled .app - use models/ next to executable
-                target_dir = Path(sys._MEIPASS).parent / "models"
+                # Bundled .app - use Application Support directory
+                target_dir = get_app_config_dir().parent / "models"
             else:
                 # Development - use models/ in project root
                 target_dir = Path(__file__).parent.parent / "models"
             target_dir.mkdir(parents=True, exist_ok=True)
-            self.after(0, lambda: self.status_label.config(text=f"Downloading to {target_dir.name}/ (~310MB)..."))
+            self.after(0, lambda: self.status_label.config(text=f"Downloading to Application Support (~310MB)..."))
 
         if not download_models(verbose=False, target_dir=target_dir):
             raise RuntimeError("Model download failed")
+
+        # Set environment variable for reader backend
+        if target_dir:
+            os.environ['AUDIOBOOK_READER_MODELS_DIR'] = str(target_dir)
+            # Save to config for future sessions
+            config_file = get_app_config_dir() / "models_path.conf"
+            config_file.write_text(str(target_dir))
 
     def on_download_complete(self):
         self.status_label.config(text="All dependencies are installed!")
@@ -461,6 +471,20 @@ def run_dependency_check(parent):
                 if logger:
                     logger.log(f"Failed to restore FFmpeg PATH: {e}", "WARN")
                 print(f"Warning: Failed to restore FFmpeg PATH: {e}", file=sys.stderr)
+
+        # Restore models path from previous session
+        models_conf = get_app_config_dir() / "models_path.conf"
+        if models_conf.exists():
+            try:
+                models_dir = models_conf.read_text().strip()
+                if logger:
+                    logger.log(f"Restoring models path from config: {models_dir}")
+                if models_dir:
+                    os.environ['AUDIOBOOK_READER_MODELS_DIR'] = models_dir
+            except Exception as e:
+                if logger:
+                    logger.log(f"Failed to restore models path: {e}", "WARN")
+                print(f"Warning: Failed to restore models path: {e}", file=sys.stderr)
 
         if logger:
             logger.log("Checking dependencies...")
