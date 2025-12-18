@@ -2,15 +2,29 @@
 
 import PyInstaller.__main__
 import sys
+import os
 import shutil
 from pathlib import Path
 
 # Get project root
 PROJECT_ROOT = Path(__file__).parent.parent
 ICON_PATH = PROJECT_ROOT / "reader_gui" / "assets" / "icon.ico"
+ASSETS_PATH = PROJECT_ROOT / "reader_gui" / "assets"
 
 def build_windows():
     """Build Windows executable."""
+
+    # Change to project root for relative paths
+    os.chdir(PROJECT_ROOT)
+
+    # Check that reader package exists
+    reader_path = PROJECT_ROOT.parent / "reader"
+    if not reader_path.exists():
+        print(f"\n❌ ERROR: Reader package not found at {reader_path}")
+        print("   Make sure the reader package is in ../reader/")
+        sys.exit(1)
+
+    print(f"✓ Found reader package at {reader_path}")
 
     # Clean dist directory before building
     dist_dir = PROJECT_ROOT / "dist"
@@ -23,9 +37,10 @@ def build_windows():
         str(PROJECT_ROOT / "reader_gui" / "gui.py"),
         "--name=AudiobookReader",
         "--noconsole",
-        "--onefile",
-        f"--icon={ICON_PATH}" if ICON_PATH.exists() else "",
-        "--add-data=reader_gui/assets;reader_gui/assets",  # Note: semicolon for Windows
+        "--onedir",  # Changed to onedir for better compatibility with data files
+        f"--icon={ICON_PATH}",
+        f"--add-data={ASSETS_PATH};reader_gui/assets",  # Note: semicolon for Windows
+        f"--paths={reader_path}",  # Tell PyInstaller where to find reader
         # Reader backend package
         "--hidden-import=reader",
         "--hidden-import=reader.cli",
@@ -54,12 +69,20 @@ def build_windows():
         "--hidden-import=reader.chapters.chapter_manager",
         "--hidden-import=reader.utils",
         "--hidden-import=reader.utils.setup",
+        "--hidden-import=reader.utils.model_downloader",
         # GUI dependencies
         "--hidden-import=tkinter",
         "--hidden-import=ttkbootstrap",
         "--hidden-import=queue",
         "--hidden-import=matplotlib",
         "--hidden-import=matplotlib.backends.backend_tkagg",
+        # GUI package modules
+        "--hidden-import=reader_gui.startup_diagnostics",
+        "--hidden-import=reader_gui.dependency_check",
+        "--hidden-import=reader_gui.app_dirs",
+        "--hidden-import=reader_gui.threads",
+        # Dependency auto-download
+        "--hidden-import=imageio_ffmpeg",
         # Core dependencies
         "--hidden-import=ebooklib",
         "--hidden-import=PyPDF2",
@@ -81,21 +104,20 @@ def build_windows():
         "--clean",
     ]
 
-    # Remove empty icon arg if file doesn't exist
-    args = [arg for arg in args if arg]
-
     print("Building Windows executable...")
-    if ICON_PATH.exists():
-        print(f"Icon: {ICON_PATH}")
-    else:
-        print("Warning: icon.ico not found, building without icon")
+    print(f"Icon: {ICON_PATH}")
+    print(f"Assets: {ASSETS_PATH}")
 
     PyInstaller.__main__.run(args)
 
-    print("\nBuild complete!")
-    print(f"Executable: {PROJECT_ROOT}/dist/AudiobookReader.exe")
+    print("\n✓ Build complete!")
+    print(f"Application directory: {PROJECT_ROOT}/dist/AudiobookReader/")
+    print(f"Executable: {PROJECT_ROOT}/dist/AudiobookReader/AudiobookReader.exe")
     print("\nTo test:")
-    print("  dist\\AudiobookReader.exe")
+    print("  .\\dist\\AudiobookReader\\AudiobookReader.exe")
+    print("\nTo distribute:")
+    print("  Create a ZIP archive of the AudiobookReader folder")
+    print("  Or use a tool like Inno Setup to create an installer")
 
 if __name__ == "__main__":
     build_windows()

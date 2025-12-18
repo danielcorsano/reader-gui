@@ -70,12 +70,20 @@ def build_macos():
         "--hidden-import=reader.chapters.chapter_manager",
         "--hidden-import=reader.utils",
         "--hidden-import=reader.utils.setup",
+        "--hidden-import=reader.utils.model_downloader",
         # GUI dependencies
         "--hidden-import=tkinter",
         "--hidden-import=ttkbootstrap",
         "--hidden-import=queue",
         "--hidden-import=matplotlib",
         "--hidden-import=matplotlib.backends.backend_tkagg",
+        # GUI package modules
+        "--hidden-import=reader_gui.startup_diagnostics",
+        "--hidden-import=reader_gui.dependency_check",
+        "--hidden-import=reader_gui.app_dirs",
+        "--hidden-import=reader_gui.threads",
+        # Dependency auto-download
+        "--hidden-import=imageio_ffmpeg",
         # Core dependencies
         "--hidden-import=ebooklib",
         "--hidden-import=PyPDF2",

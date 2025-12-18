@@ -2,15 +2,20 @@
 
 import PyInstaller.__main__
 import sys
+import os
 import shutil
 from pathlib import Path
 
 # Get project root
 PROJECT_ROOT = Path(__file__).parent.parent
 ICON_PATH = PROJECT_ROOT / "reader_gui" / "assets" / "icon.png"
+ASSETS_PATH = PROJECT_ROOT / "reader_gui" / "assets"
 
 def build_linux():
     """Build Linux executable."""
+
+    # Change to project root for relative paths
+    os.chdir(PROJECT_ROOT)
 
     # Check that reader package exists
     reader_path = PROJECT_ROOT.parent / "reader"
@@ -32,9 +37,9 @@ def build_linux():
         str(PROJECT_ROOT / "reader_gui" / "gui.py"),
         "--name=audiobook-reader-gui",
         "--onedir",
-        f"--icon={ICON_PATH}" if ICON_PATH.exists() else "",
-        "--add-data=reader_gui/assets:reader_gui/assets",
-        f"--paths={reader_path}",
+        f"--icon={ICON_PATH}",
+        f"--add-data={ASSETS_PATH}:reader_gui/assets",  # Note: colon for Linux
+        f"--paths={reader_path}",  # Tell PyInstaller where to find reader
         # Reader backend package
         "--hidden-import=reader",
         "--hidden-import=reader.cli",
@@ -63,12 +68,20 @@ def build_linux():
         "--hidden-import=reader.chapters.chapter_manager",
         "--hidden-import=reader.utils",
         "--hidden-import=reader.utils.setup",
+        "--hidden-import=reader.utils.model_downloader",
         # GUI dependencies
         "--hidden-import=tkinter",
         "--hidden-import=ttkbootstrap",
         "--hidden-import=queue",
         "--hidden-import=matplotlib",
         "--hidden-import=matplotlib.backends.backend_tkagg",
+        # GUI package modules
+        "--hidden-import=reader_gui.startup_diagnostics",
+        "--hidden-import=reader_gui.dependency_check",
+        "--hidden-import=reader_gui.app_dirs",
+        "--hidden-import=reader_gui.threads",
+        # Dependency auto-download
+        "--hidden-import=imageio_ffmpeg",
         # Core dependencies
         "--hidden-import=ebooklib",
         "--hidden-import=PyPDF2",
@@ -92,14 +105,9 @@ def build_linux():
         "--clean",
     ]
 
-    # Remove empty icon arg if file doesn't exist
-    args = [arg for arg in args if arg]
-
     print("Building Linux executable...")
-    if ICON_PATH.exists():
-        print(f"Icon: {ICON_PATH}")
-    else:
-        print("Warning: icon.png not found, building without icon")
+    print(f"Icon: {ICON_PATH}")
+    print(f"Assets: {ASSETS_PATH}")
 
     PyInstaller.__main__.run(args)
 
@@ -108,8 +116,11 @@ def build_linux():
     print(f"Executable: {PROJECT_ROOT}/dist/audiobook-reader-gui/audiobook-reader-gui")
     print("\nTo test:")
     print("  ./dist/audiobook-reader-gui/audiobook-reader-gui")
-    print("\nTo create AppImage:")
-    print("  See: https://appimage.org/")
+    print("\nTo distribute:")
+    print("  Create a .tar.gz archive:")
+    print("    tar -czf audiobook-reader-gui-linux.tar.gz -C dist audiobook-reader-gui")
+    print("  Or create an AppImage:")
+    print("    See: https://appimage.org/")
 
 if __name__ == "__main__":
     build_linux()
