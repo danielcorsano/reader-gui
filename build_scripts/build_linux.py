@@ -20,11 +20,11 @@ def build_linux():
     # Check that reader package exists
     reader_path = PROJECT_ROOT.parent / "reader"
     if not reader_path.exists():
-        print(f"\n❌ ERROR: Reader package not found at {reader_path}")
+        print(f"\nERROR: Reader package not found at {reader_path}")
         print("   Make sure the reader package is in ../reader/")
         sys.exit(1)
 
-    print(f"✓ Found reader package at {reader_path}")
+    print(f"Found reader package at {reader_path}")
 
     # Clean dist directory before building
     dist_dir = PROJECT_ROOT / "dist"
@@ -111,7 +111,7 @@ def build_linux():
 
     PyInstaller.__main__.run(args)
 
-    print("\n✓ Build complete!")
+    print("\nBuild complete!")
     print(f"Application bundle: {PROJECT_ROOT}/dist/audiobook-reader-gui/")
     print(f"Executable: {PROJECT_ROOT}/dist/audiobook-reader-gui/audiobook-reader-gui")
     print("\nTo test:")

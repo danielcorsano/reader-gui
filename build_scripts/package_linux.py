@@ -12,11 +12,11 @@ def package_linux():
     build_dir = PROJECT_ROOT / "dist" / "audiobook-reader-gui"
 
     if not build_dir.exists():
-        print(f"❌ ERROR: Build directory not found: {build_dir}")
+        print(f"ERROR: Build directory not found: {build_dir}")
         print("   Run build_linux.py first")
         sys.exit(1)
 
-    print(f"✓ Found build directory: {build_dir}")
+    print(f"Found build directory: {build_dir}")
 
     # Get version from pyproject.toml
     try:
@@ -47,7 +47,7 @@ def package_linux():
     archive_file = Path(f"{archive_path}.tar.gz")
     size_mb = archive_file.stat().st_size / (1024 * 1024)
 
-    print(f"\n✓ Package created: {archive_file}")
+    print(f"\nPackage created: {archive_file}")
     print(f"  Size: {size_mb:.1f} MB")
     print("\nReady for distribution!")
     print("\nTo install on Linux:")

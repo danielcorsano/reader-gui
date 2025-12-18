@@ -12,11 +12,11 @@ def package_windows():
     build_dir = PROJECT_ROOT / "dist" / "AudiobookReader"
 
     if not build_dir.exists():
-        print(f"❌ ERROR: Build directory not found: {build_dir}")
+        print(f"ERROR: Build directory not found: {build_dir}")
         print("   Run build_windows.py first")
         sys.exit(1)
 
-    print(f"✓ Found build directory: {build_dir}")
+    print(f"Found build directory: {build_dir}")
 
     # Get version from pyproject.toml
     try:
@@ -47,7 +47,7 @@ def package_windows():
     zip_file = Path(f"{zip_path}.zip")
     size_mb = zip_file.stat().st_size / (1024 * 1024)
 
-    print(f"\n✓ Package created: {zip_file}")
+    print(f"\nPackage created: {zip_file}")
     print(f"  Size: {size_mb:.1f} MB")
     print("\nReady for distribution!")
 
