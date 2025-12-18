@@ -5,8 +5,8 @@ See [CHANGELOG](https://github.com/danielcorsano/reader-gui/blob/main/CHANGELOG.
 ## Downloads
 
 - **macOS**: `AudiobookReader.dmg` - Download and mount
-- **Windows**: `AudiobookReader-{version}-Windows.zip` - Extract and run AudiobookReader.exe
-- **Linux**: `audiobook-reader-gui-{version}-Linux.tar.gz` - Extract and run
+- **Windows**: `AudiobookReader.exe` - Download and run
+- **Linux**: `AudiobookReader-linux.tar.gz` - Extract and run
 
 ## Features
 - 54 AI Voices: Kokoro-82M TTS (9 languages)
