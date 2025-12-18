@@ -66,11 +66,14 @@ jobs:
       - name: Build Windows executable
         run: poetry run python build_scripts/build_windows.py
 
+      - name: Package Windows build
+        run: poetry run python build_scripts/package_windows.py
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: dist/AudiobookReader.exe
+          path: dist/AudiobookReader-*-Windows.zip
 
   build-linux:
     runs-on: ubuntu-latest
@@ -98,16 +101,14 @@ jobs:
       - name: Build Linux executable
         run: poetry run python build_scripts/build_linux.py
 
-      - name: Create tarball
-        run: |
-          cd dist
-          tar -czf AudiobookReader-linux.tar.gz audiobook-reader-gui
+      - name: Package Linux build
+        run: poetry run python build_scripts/package_linux.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-build
-          path: dist/AudiobookReader-linux.tar.gz
+          path: dist/audiobook-reader-gui-*-Linux.tar.gz
 
   create-release:
     needs: [build-macos, build-windows, build-linux]
@@ -137,8 +138,8 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: |
             artifacts/macos-build/AudiobookReader.dmg
-            artifacts/windows-build/AudiobookReader.exe
-            artifacts/linux-build/AudiobookReader-linux.tar.gz
+            artifacts/windows-build/*.zip
+            artifacts/linux-build/*.tar.gz
           draft: false
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
         env:
