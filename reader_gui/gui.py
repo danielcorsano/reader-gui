@@ -152,6 +152,11 @@ class AudiobookReaderGUI(ttk.Window):
         self.setup_ui()
         self._center_window()
 
+        # Handle macOS dock icon click when app is already running
+        # Prevents crash in Tcl_FindCommand for ::tk::mac::ReopenApplication
+        if platform.system() == 'Darwin':
+            self.createcommand('::tk::mac::ReopenApplication', self._on_reopen)
+
     def setup_ui(self):
         """Build the interface."""
         # Main scrollable container
@@ -749,6 +754,12 @@ class AudiobookReaderGUI(ttk.Window):
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open folder:\n\n{e}")
 
+
+    def _on_reopen(self):
+        """Handle macOS dock icon click when app is already running."""
+        self.deiconify()
+        self.lift()
+        self.focus_force()
 
     def _center_window(self):
         """Center window on screen, size based on content."""
