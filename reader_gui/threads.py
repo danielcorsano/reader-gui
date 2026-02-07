@@ -100,9 +100,6 @@ class ConversionThread(threading.Thread):
                 convert_kwargs['character_voices'] = True
                 if self.options.get('character_config'):
                     convert_kwargs['character_config'] = self.options['character_config']
-                if self.options.get('auto_assign'):
-                    convert_kwargs['auto_assign'] = True
-
             # Use progress style from options (timeseries for visualization)
             if self.options.get('progress_style'):
                 convert_kwargs['progress_style'] = self.options['progress_style']
