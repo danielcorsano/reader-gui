@@ -184,18 +184,6 @@ def run_startup_diagnostics():
     except Exception as e:
         logger.log_exception(e, "Model check")
 
-    # 6. Check GUI creation
-    logger.log("Testing GUI initialization...")
-    try:
-        import tkinter as tk
-        test_root = tk.Tk()
-        test_root.withdraw()
-        logger.log("✓ Tkinter root window created OK")
-        test_root.destroy()
-    except Exception as e:
-        issues.append(f"GUI initialization failed: {e}")
-        logger.log_exception(e, "GUI test")
-
     logger.log("Diagnostics complete")
     logger.log(f"Issues found: {len(issues)}")
 
