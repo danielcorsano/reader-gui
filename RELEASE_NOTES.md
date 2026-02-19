@@ -1,10 +1,10 @@
-# Audiobook Reader v0.3.8
+# Audiobook Reader v0.3.9
 
 See [CHANGELOG](https://github.com/danielcorsano/reader-gui/blob/main/CHANGELOG.md) for version history.
 
 ## Downloads
 
-- **macOS**: `AudiobookReader.dmg` - Download and mount
+- **macOS**: `AudiobookReader.dmg` - Download and mount. On first launch macOS will block it (unsigned app) — go to System Settings → Privacy & Security → Open Anyway, authenticate, then confirm Open.
 - **Windows**: `AudiobookReader.exe` - Download and run
 - **Linux**: `AudiobookReader-linux.tar.gz` - Extract and run
 
