@@ -6,7 +6,8 @@ Desktop GUI for [audiobook-reader](https://github.com/danielcorsano/reader). Con
 
 **[Download latest release](https://github.com/danielcorsano/reader-gui/releases)**
 
-- **macOS**: Download `AudiobookReader-macos.zip`, unzip, run `AudiobookReader.app`
+- **macOS (Apple Silicon, 2020+)**: Download `AudiobookReader-arm64.dmg`
+- **macOS (Intel, pre-2020)**: Download `AudiobookReader-x64.dmg`
 - **Windows**: Download `AudiobookReader.exe` and run
 - **Linux**: Download `AudiobookReader-linux.tar.gz`, extract, and run
 

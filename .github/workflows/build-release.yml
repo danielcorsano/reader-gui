@@ -8,7 +8,7 @@ on:
       - 'v*-alpha'
 
 jobs:
-  build-macos:
+  build-macos-arm64:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,41 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos-build
+          name: macos-arm64-build
+          path: dist/AudiobookReader.dmg
+
+  build-macos-x64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Checkout reader dependency
+        run: |
+          cd ..
+          git clone https://github.com/danielcorsano/reader.git
+
+      - name: Install dependencies
+        run: |
+          pip install "onnxruntime>=1.20.1,<1.24"
+          poetry install --with build
+
+      - name: Build macOS app
+        run: poetry run python build_scripts/build_macos.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-x64-build
           path: dist/AudiobookReader.dmg
 
   build-windows:
@@ -111,7 +145,7 @@ jobs:
           path: dist/audiobook-reader-gui-*-Linux.tar.gz
 
   create-release:
-    needs: [build-macos, build-windows, build-linux]
+    needs: [build-macos-arm64, build-macos-x64, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -122,6 +156,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Rename macOS artifacts
+        run: |
+          mv artifacts/macos-arm64-build/AudiobookReader.dmg artifacts/macos-arm64-build/AudiobookReader-arm64.dmg
+          mv artifacts/macos-x64-build/AudiobookReader.dmg artifacts/macos-x64-build/AudiobookReader-x64.dmg
 
       - name: Check if pre-release
         id: prerelease
@@ -137,7 +176,8 @@ jobs:
         with:
           body_path: RELEASE_NOTES.md
           files: |
-            artifacts/macos-build/AudiobookReader.dmg
+            artifacts/macos-arm64-build/AudiobookReader-arm64.dmg
+            artifacts/macos-x64-build/AudiobookReader-x64.dmg
             artifacts/windows-build/*.zip
             artifacts/linux-build/*.tar.gz
           draft: false
