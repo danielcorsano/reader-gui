@@ -10,8 +10,14 @@ import shutil
 import platform
 import os
 import subprocess
+import urllib.request
+import traceback
+import webbrowser
 
 from reader_gui.app_dirs import get_app_config_dir
+
+MODEL_BASE_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+MODEL_FILES = ["kokoro-v1.0.onnx", "voices-v1.0.bin"]
 
 
 def augment_path_with_common_locations():
@@ -33,13 +39,10 @@ def augment_path_with_common_locations():
     os.environ['PATH'] = os.pathsep.join(path_parts)
 
 
-
-
 def get_model_locations():
     """Get possible model locations (package models/ and system cache)."""
     locations = []
 
-    # Check for manually specified model path
     config_file = get_app_config_dir() / "models_path.conf"
     if config_file.exists():
         try:
@@ -49,13 +52,10 @@ def get_model_locations():
         except Exception:
             pass
 
-    # Package models/ directory (for development/bundled)
     try:
         if getattr(sys, 'frozen', False):
-            # Running as bundled .app - check Application Support directory
             base_path = get_app_config_dir().parent
         else:
-            # Running from source
             base_path = Path(__file__).parent.parent
 
         package_models = base_path / "models" / "kokoro"
@@ -64,7 +64,6 @@ def get_model_locations():
     except Exception:
         pass
 
-    # System cache (standard location)
     if platform.system() == "Windows":
         cache = Path.home() / "AppData/Local/audiobook-reader/models/kokoro"
     elif platform.system() == "Darwin":
@@ -78,22 +77,17 @@ def get_model_locations():
 
 def check_ffmpeg():
     """Check if FFmpeg is installed using reliable methods."""
-
-    # 1. Check FFMPEG_PATH environment variable
     env_path = os.environ.get('FFMPEG_PATH')
     if env_path:
         ffmpeg_bin = Path(env_path)
         if ffmpeg_bin.exists() and _is_executable(ffmpeg_bin):
             return True, str(ffmpeg_bin)
 
-    # 2. Check system PATH with shutil.which
     ffmpeg_path = shutil.which("ffmpeg")
     if ffmpeg_path:
         return True, ffmpeg_path
 
-    # 3. Check common installation locations directly
     common_locations = []
-
     if platform.system() == "Darwin":
         common_locations = [
             Path("/opt/homebrew/bin/ffmpeg"),
@@ -120,12 +114,10 @@ def check_ffmpeg():
         if path.exists() and _is_executable(path):
             return True, str(path)
 
-    # Not found - will trigger dependency popup
     return False, None
 
 
 def _is_executable(path):
-    """Check if a file is executable."""
     return os.access(str(path), os.X_OK)
 
 
@@ -133,17 +125,14 @@ def check_dependencies():
     """Check for ffmpeg and model, return missing dependencies."""
     missing = []
 
-    # Check FFmpeg and add to PATH if needed
     ffmpeg_found, ffmpeg_path = check_ffmpeg()
     if not ffmpeg_found:
         missing.append("ffmpeg")
     elif ffmpeg_path:
-        # Add to PATH if not already there (for bundled .app)
         ffmpeg_dir = str(Path(ffmpeg_path).parent)
         if ffmpeg_dir not in os.environ.get('PATH', ''):
             os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
 
-    # Check if models exist in any location
     model_found = False
     for location in get_model_locations():
         model = location / "kokoro-v1.0.onnx"
@@ -159,124 +148,374 @@ def check_dependencies():
 
 
 class DependencyPopup(tk.Toplevel):
-    """Modal popup for downloading missing dependencies."""
+    """Modal popup for downloading missing dependencies — two-column layout with per-dep progress."""
 
     def __init__(self, parent, missing):
         super().__init__(parent)
-        self.title("Missing Dependencies")
+        self.title("Dependency Downloader")
         self.transient(parent)
         self.grab_set()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.configure(background="#000000")
 
-        self.missing = missing
+        self.missing = list(missing)
         self.download_complete = threading.Event()
         self.parent = parent
         self.permanent_models = tk.BooleanVar(value=True)
+        self._ffmpeg_resolved = "ffmpeg" not in missing
+        self._model_resolved = "model" not in missing
+        self._ffmpeg_error_tb = None
+        self._model_error_tb = None
 
-        # CRITICAL: Get style from parent window - DON'T create new Style() instance
-        # Creating multiple ttk.Style() instances causes blank/empty windows in tkinter
-        # ttkbootstrap.Window already has a Style, so we reuse it
         if hasattr(parent, 'style'):
-            # Parent is ttkbootstrap.Window with style attribute
             style = parent.style
         else:
-            # Fallback: get default style (shares instance across app)
             style = ttk.Style()
 
-        # Configure dependency popup styles using parent's theme
         style.configure('Dep.TFrame', background='#000000')
         style.configure('Dep.TLabel', background='#000000', foreground='#FFD700', font=("Monaco", 13))
-        style.configure('Dep.TButton', background='#FFD700', foreground='#000000', font=("Monaco", 13), padding=(10, 5))
-        style.configure('Dep.TLabelframe', background='#000000', foreground='#FFD700', bordercolor='#FFD700')
-        style.configure('Dep.TLabelframe.Label', background='#000000', foreground='#FFD700', font=("Monaco", 13, "bold"))
-        style.configure('TProgressbar', troughcolor='#333333', background='#FFD700', thickness=20)
-        style.configure('Dep.TCheckbutton', background='#000000', foreground='#FFD700', font=("Monaco", 11))
+        style.configure('Dep.Bold.TLabel', background='#000000', foreground='#FFD700', font=("Monaco", 15, "bold"))
+        style.configure('Dep.Ok.TLabel', background='#000000', foreground='#00CC44', font=("Monaco", 13))
+        style.configure('Dep.TButton', background='#FFD700', foreground='#000000', font=("Monaco", 13),
+                        borderwidth=0, relief='flat', focuscolor='none', padding=(8, 4))
+        style.map('Dep.TButton',
+                  background=[('disabled', '#555555'), ('active', '#FFFFFF'), ('!active', '#FFD700')],
+                  foreground=[('disabled', '#888888'), ('active', '#000000'), ('!active', '#000000')])
+        style.configure('Dep.TCheckbutton', background='#000000', foreground='#FFD700', font=("Monaco", 13),
+                        focuscolor='#000000', borderwidth=0)
+        style.map('Dep.TCheckbutton',
+                  background=[('active', '#000000'), ('selected', '#000000')],
+                  foreground=[('active', '#FFFFFF'), ('selected', '#FFFFFF'), ('!selected', '#FFD700')])
+        style.configure('TProgressbar', troughcolor='#333333', background='#FFD700', thickness=16)
 
-        main_frame = ttk.Frame(self, padding=20, style='Dep.TFrame')
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        # Top bar
+        top = ttk.Frame(self, style='Dep.TFrame')
+        top.pack(fill=tk.X, padx=15, pady=(12, 8))
+        ttk.Label(top, text="Dependency Downloader", style='Dep.Bold.TLabel').pack(side=tk.LEFT)
+        tk.Button(top, text="?", bg="#FFD700", fg="#000000", font=("Monaco", 13, "bold"),
+                  relief="flat", cursor="hand2", padx=8,
+                  command=self._open_help).pack(side=tk.RIGHT)
 
-        missing_text = "Missing: " + ", ".join(missing)
-        ttk.Label(main_frame, text=missing_text, style='Dep.TLabel').pack(pady=(0, 10))
+        # Divider
+        tk.Frame(self, bg="#333333", height=1).pack(fill=tk.X, padx=15)
 
-        self.status_label = ttk.Label(main_frame, text="Click Download to install dependencies", style='Dep.TLabel')
-        self.status_label.pack(pady=10)
+        # Two-column body
+        body = ttk.Frame(self, style='Dep.TFrame')
+        body.pack(fill=tk.BOTH, expand=True, padx=15, pady=12)
 
-        # Model location preference
-        if "model" in self.missing:
-            model_opts_frame = ttk.Frame(main_frame, style='Dep.TFrame')
-            model_opts_frame.pack(pady=5)
-            check = ttk.Checkbutton(
-                model_opts_frame,
-                text="Download models to app directory (permanent)",
-                variable=self.permanent_models,
-                style='Dep.TCheckbutton'
-            )
-            check.pack()
+        self.ffmpeg_col = ttk.Frame(body, style='Dep.TFrame')
+        self.ffmpeg_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
-        self.progress = ttk.Progressbar(main_frame, mode='determinate', style='TProgressbar', length=400)
-        self.progress.pack(pady=10)
+        tk.Frame(body, bg="#333333", width=1).pack(side=tk.LEFT, fill=tk.Y)
 
-        btn_frame = ttk.Frame(main_frame, style='Dep.TFrame')
-        btn_frame.pack(pady=15)
+        self.model_col = ttk.Frame(body, style='Dep.TFrame')
+        self.model_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
-        # Prominent "Specify Path" buttons for manual installation
-        if "ffmpeg" in self.missing:
-            specify_ffmpeg_btn = ttk.Button(btn_frame, text="Specify FFmpeg", command=self.specify_ffmpeg_path, style='Dep.TButton')
-            specify_ffmpeg_btn.pack(side=tk.LEFT, padx=5)
-
-        if "model" in self.missing:
-            specify_models_btn = ttk.Button(btn_frame, text="Specify Models", command=self.specify_models_path, style='Dep.TButton')
-            specify_models_btn.pack(side=tk.LEFT, padx=5)
-
-        self.download_btn = ttk.Button(btn_frame, text="Auto Download", command=self.start_download, style='Dep.TButton')
-        self.download_btn.pack(side=tk.LEFT, padx=5)
-        cancel_btn = ttk.Button(btn_frame, text="Cancel", command=self._on_close, style='Dep.TButton')
-        cancel_btn.pack(side=tk.LEFT, padx=5)
-
-        cmd_frame = ttk.Labelframe(main_frame, text="Alternative: Terminal Command", padding=10, style='Dep.TLabelframe')
-        cmd_frame.pack(pady=10, fill=tk.X)
-
-        self.terminal_cmd = self.get_terminal_command()
-
-        # Configure Entry style with font (safer than passing font directly)
-        style.configure('Cmd.TEntry', font=("Monaco", 11))
-        cmd_entry = ttk.Entry(cmd_frame, style='Cmd.TEntry')
-        cmd_entry.insert(0, self.terminal_cmd)
-        cmd_entry.config(state="readonly")
-        cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-
-        copy_btn = ttk.Button(cmd_frame, text="Copy", command=self.copy_command, style='Dep.TButton', width=8)
-        copy_btn.pack(side=tk.LEFT)
+        self._build_ffmpeg_column()
+        self._build_model_column()
 
         self.center_window()
 
-    def center_window(self):
-        self.update_idletasks()
-        width = 700
-        height = 400
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
-        self.geometry(f'{width}x{height}+{x}+{y}')
+    # ── Column builders ──────────────────────────────────────────────────────
 
-    def get_terminal_command(self):
-        commands = []
-        system = platform.system()
+    def _build_ffmpeg_column(self):
+        col = self.ffmpeg_col
+
+        ttk.Label(col, text="FFmpeg", style='Dep.Bold.TLabel').pack(pady=(0, 8))
+
+        if self._ffmpeg_resolved:
+            ttk.Label(col, text="✓ Already installed", style='Dep.Ok.TLabel').pack(pady=2)
+        else:
+            self.ffmpeg_dl_btn = ttk.Button(col, text="Auto Download", style='Dep.TButton',
+                                            command=self._start_ffmpeg_download)
+            self.ffmpeg_dl_btn.pack(pady=2)
+
+            self.ffmpeg_progress = ttk.Progressbar(col, mode='indeterminate',
+                                                   style='TProgressbar', length=220)
+            # hidden until download starts
+
+            self.ffmpeg_ok_label = ttk.Label(col, text="✓ Installed", style='Dep.Ok.TLabel')
+
+            self.ffmpeg_error_label = ttk.Label(col, text="[!] Error — click for details",
+                                                background='#000000', foreground='#FF4444',
+                                                font=("Monaco", 13), cursor="hand2")
+            self.ffmpeg_error_label.bind("<Button-1>", lambda e: self._show_ffmpeg_error())
+
+        ttk.Button(col, text="Manual Install", style='Dep.TButton',
+                   command=self._show_ffmpeg_manual).pack(pady=2)
+        ttk.Button(col, text="Specify FFmpeg", style='Dep.TButton',
+                   command=self.specify_ffmpeg_path).pack(pady=2)
+
+    def _build_model_column(self):
+        col = self.model_col
+
+        ttk.Label(col, text="Models", style='Dep.Bold.TLabel').pack(pady=(0, 8))
+
+        if self._model_resolved:
+            ttk.Label(col, text="✓ Already installed", style='Dep.Ok.TLabel').pack(pady=2)
+        else:
+            self.model_dl_btn = ttk.Button(col, text="Auto Download", style='Dep.TButton',
+                                           command=self._start_model_download)
+            self.model_dl_btn.pack(pady=2)
+
+            self.model_progress_var = tk.DoubleVar(value=0)
+            self.model_progress = ttk.Progressbar(col, mode='determinate',
+                                                  style='TProgressbar', length=220,
+                                                  variable=self.model_progress_var)
+            # hidden until download starts
+
+            self.model_status_label = ttk.Label(col, text="", style='Dep.TLabel')
+            # hidden until download starts
+
+            self.model_ok_label = ttk.Label(col, text="✓ Models ready", style='Dep.Ok.TLabel')
+
+            self.model_error_label = ttk.Label(col, text="[!] Error — click for details",
+                                               background='#000000', foreground='#FF4444',
+                                               font=("Monaco", 13), cursor="hand2")
+            self.model_error_label.bind("<Button-1>", lambda e: self._show_model_error())
+
+        ttk.Button(col, text="Manual Install", style='Dep.TButton',
+                   command=self._show_models_manual).pack(pady=2)
+        ttk.Button(col, text="Specify Models", style='Dep.TButton',
+                   command=self.specify_models_path).pack(pady=2)
+
+        self.model_perm_check = ttk.Checkbutton(col, text="Download permanently",
+                                                variable=self.permanent_models,
+                                                style='Dep.TCheckbutton')
+        self.model_perm_check.pack(pady=(8, 2))
+
+    # ── FFmpeg download ───────────────────────────────────────────────────────
+
+    def _start_ffmpeg_download(self):
+        self.ffmpeg_dl_btn.config(state="disabled")
+        if hasattr(self, 'ffmpeg_error_label'):
+            self.ffmpeg_error_label.pack_forget()
+        self.ffmpeg_progress.pack(pady=4)
+        self.ffmpeg_progress.start(10)
+        threading.Thread(target=self._download_ffmpeg_worker, daemon=True).start()
+
+    def _download_ffmpeg_worker(self):
+        try:
+            import imageio_ffmpeg
+            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+            ffmpeg_dir = str(Path(ffmpeg_exe).parent)
+
+            if ffmpeg_dir not in os.environ.get('PATH', ''):
+                os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
+
+            config_file = get_app_config_dir() / "ffmpeg_path.conf"
+            config_file.write_text(ffmpeg_dir)
+
+            self.after(0, self._on_ffmpeg_success)
+        except Exception:
+            tb = traceback.format_exc()
+            self.after(0, lambda err=tb: self._on_ffmpeg_error(err))
+
+    def _on_ffmpeg_success(self):
+        self.ffmpeg_progress.stop()
+        self.ffmpeg_progress.pack_forget()
+        self.ffmpeg_ok_label.pack(pady=2)
+        self._ffmpeg_resolved = True
         if "ffmpeg" in self.missing:
-            if system == 'Darwin':
-                commands.append("brew install ffmpeg OR sudo port install ffmpeg OR download from ffmpeg.org")
-            elif system == 'Linux':
-                commands.append("sudo apt install ffmpeg OR download from ffmpeg.org")
-            else:
-                commands.append("Download from: https://ffmpeg.org/download.html")
-        if "model" in self.missing:
-            commands.append("Models auto-download on first use")
-        return " | ".join(commands) if commands else "No manual steps needed."
+            self.missing.remove("ffmpeg")
+        self._check_both_done()
 
-    def copy_command(self):
+    def _on_ffmpeg_error(self, tb):
+        self._ffmpeg_error_tb = tb
+        self.ffmpeg_progress.stop()
+        self.ffmpeg_progress.pack_forget()
+        self.ffmpeg_error_label.pack(pady=2)
+        self.ffmpeg_dl_btn.config(state="normal")
+
+    # ── Model download ────────────────────────────────────────────────────────
+
+    def _start_model_download(self):
+        self.model_dl_btn.config(state="disabled")
+        if hasattr(self, 'model_error_label'):
+            self.model_error_label.pack_forget()
+        self.model_progress.pack(pady=4)
+        self.model_status_label.pack()
+        threading.Thread(target=self._download_model_worker, daemon=True).start()
+
+    def _download_model_worker(self):
+        try:
+            target_dir = None
+            if self.permanent_models.get():
+                if getattr(sys, 'frozen', False):
+                    target_dir = get_app_config_dir().parent / "models"
+                else:
+                    target_dir = Path(__file__).parent.parent / "models"
+                target_dir.mkdir(parents=True, exist_ok=True)
+
+            cache = (target_dir or self._default_cache()) / "kokoro"
+            cache.mkdir(parents=True, exist_ok=True)
+
+            n_files = len(MODEL_FILES)
+            for i, name in enumerate(MODEL_FILES):
+                dest = cache / name
+                if dest.exists():
+                    self.after(0, lambda p=(i + 1) * (100 // n_files): self.model_progress_var.set(p))
+                    continue
+                offset = i * (100 // n_files)
+                share = 100 // n_files
+
+                def make_hook(off, sh):
+                    def hook(block_num, block_size, total_size):
+                        if total_size > 0:
+                            pct = off + min(sh, block_num * block_size * sh / total_size)
+                            self.after(0, lambda p=pct: self.model_progress_var.set(p))
+                    return hook
+
+                self.after(0, lambda n=name: self.model_status_label.config(text=f"Downloading {n}..."))
+                urllib.request.urlretrieve(
+                    f"{MODEL_BASE_URL}/{name}", dest,
+                    reporthook=make_hook(offset, share)
+                )
+
+            self.after(0, lambda: self.model_progress_var.set(100))
+
+            if target_dir:
+                os.environ['AUDIOBOOK_READER_MODELS_DIR'] = str(target_dir)
+                config_file = get_app_config_dir() / "models_path.conf"
+                config_file.write_text(str(target_dir))
+
+            self.after(0, self._on_model_success)
+        except Exception:
+            tb = traceback.format_exc()
+            self.after(0, lambda err=tb: self._on_model_error(err))
+
+    def _default_cache(self):
+        if platform.system() == "Windows":
+            return Path.home() / "AppData/Local/audiobook-reader/models"
+        elif platform.system() == "Darwin":
+            return Path.home() / "Library/Caches/audiobook-reader/models"
+        else:
+            return Path.home() / ".cache/audiobook-reader/models"
+
+    def _on_model_success(self):
+        self.model_progress.pack_forget()
+        self.model_status_label.pack_forget()
+        self.model_ok_label.pack(pady=2)
+        self._model_resolved = True
+        if "model" in self.missing:
+            self.missing.remove("model")
+        self._check_both_done()
+
+    def _on_model_error(self, tb):
+        self._model_error_tb = tb
+        self.model_progress.pack_forget()
+        self.model_status_label.pack_forget()
+        self.model_error_label.pack(pady=2)
+        self.model_dl_btn.config(state="normal")
+
+    # ── Auto-close ────────────────────────────────────────────────────────────
+
+    def _check_both_done(self):
+        if self._ffmpeg_resolved and self._model_resolved:
+            self.after(1500, self.close_popup)
+
+    # ── Error display ─────────────────────────────────────────────────────────
+
+    def _show_ffmpeg_error(self):
+        if self._ffmpeg_error_tb:
+            messagebox.showerror("FFmpeg Download Error", self._ffmpeg_error_tb, parent=self)
+
+    def _show_model_error(self):
+        if self._model_error_tb:
+            messagebox.showerror("Model Download Error", self._model_error_tb, parent=self)
+
+    # ── Manual install popups ─────────────────────────────────────────────────
+
+    def _show_ffmpeg_manual(self):
+        win = tk.Toplevel(self)
+        win.title("FFmpeg Manual Install")
+        win.configure(background="#000000")
+        win.transient(self)
+        win.grab_set()
+
+        f = tk.Frame(win, bg="#000000", padx=20, pady=20)
+        f.pack()
+
+        system = platform.system()
+        if system == "Darwin":
+            cmds = ["brew install ffmpeg", "sudo port install ffmpeg"]
+        elif system == "Linux":
+            cmds = ["sudo apt install ffmpeg", "sudo dnf install ffmpeg"]
+        else:
+            cmds = []
+        url = "https://ffmpeg.org/download.html"
+
+        tk.Label(f, text="Install FFmpeg with one of these commands:", bg="#000000",
+                 fg="#FFD700", font=("Monaco", 12)).pack(anchor="w", pady=(0, 8))
+
+        for cmd in cmds:
+            row = tk.Frame(f, bg="#000000")
+            row.pack(anchor="w", pady=2)
+            tk.Label(row, text=cmd, bg="#111111", fg="#FFFFFF", font=("Monaco", 11),
+                     padx=8, pady=4).pack(side=tk.LEFT)
+            tk.Button(row, text="Copy", bg="#FFD700", fg="#000000", font=("Monaco", 10),
+                      relief="flat", padx=6,
+                      command=lambda c=cmd: self._copy(c)).pack(side=tk.LEFT, padx=(6, 0))
+
+        tk.Label(f, text=f"Or download from: {url}", bg="#000000",
+                 fg="#888888", font=("Monaco", 10)).pack(anchor="w", pady=(10, 0))
+        tk.Button(f, text="Open in Browser", bg="#FFD700", fg="#000000", font=("Monaco", 11),
+                  relief="flat", padx=8, pady=4,
+                  command=lambda: webbrowser.open(url)).pack(anchor="w", pady=6)
+        tk.Button(f, text="Close", bg="#333333", fg="#FFD700", font=("Monaco", 11),
+                  relief="flat", padx=8, pady=4,
+                  command=win.destroy).pack(anchor="e", pady=(6, 0))
+
+    def _show_models_manual(self):
+        win = tk.Toplevel(self)
+        win.title("Models Manual Install")
+        win.configure(background="#000000")
+        win.transient(self)
+        win.grab_set()
+
+        f = tk.Frame(win, bg="#000000", padx=20, pady=20)
+        f.pack()
+
+        tk.Label(f, text="Install models via CLI:", bg="#000000",
+                 fg="#FFD700", font=("Monaco", 12)).pack(anchor="w", pady=(0, 8))
+
+        for cmd in ["reader download models",
+                    "pip install audiobook-reader && reader download models"]:
+            row = tk.Frame(f, bg="#000000")
+            row.pack(anchor="w", pady=2)
+            tk.Label(row, text=cmd, bg="#111111", fg="#FFFFFF", font=("Monaco", 11),
+                     padx=8, pady=4).pack(side=tk.LEFT)
+            tk.Button(row, text="Copy", bg="#FFD700", fg="#000000", font=("Monaco", 10),
+                      relief="flat", padx=6,
+                      command=lambda c=cmd: self._copy(c)).pack(side=tk.LEFT, padx=(6, 0))
+
+        tk.Label(f, text="Or download files directly:", bg="#000000",
+                 fg="#888888", font=("Monaco", 10)).pack(anchor="w", pady=(12, 4))
+
+        for name in MODEL_FILES:
+            url = f"{MODEL_BASE_URL}/{name}"
+            row = tk.Frame(f, bg="#000000")
+            row.pack(anchor="w", pady=1)
+            tk.Label(row, text=url, bg="#111111", fg="#AAAAAA", font=("Monaco", 9),
+                     padx=6, pady=2).pack(side=tk.LEFT)
+            tk.Button(row, text="Copy", bg="#FFD700", fg="#000000", font=("Monaco", 9),
+                      relief="flat", padx=4,
+                      command=lambda u=url: self._copy(u)).pack(side=tk.LEFT, padx=(4, 0))
+
+        tk.Label(f, text="Place files in: <models_dir>/kokoro/", bg="#000000",
+                 fg="#888888", font=("Monaco", 10)).pack(anchor="w", pady=(8, 0))
+        tk.Button(f, text="Close", bg="#333333", fg="#FFD700", font=("Monaco", 11),
+                  relief="flat", padx=8, pady=4,
+                  command=win.destroy).pack(anchor="e", pady=(12, 0))
+
+    def _copy(self, text):
         self.clipboard_clear()
-        self.clipboard_append(self.terminal_cmd)
-        messagebox.showinfo("Copied", "Command copied to clipboard.", parent=self)
+        self.clipboard_append(text)
+
+    def _open_help(self):
+        webbrowser.open("https://github.com/danielcorsano/reader-gui")
+
+    # ── Specify path methods ──────────────────────────────────────────────────
 
     def specify_ffmpeg_path(self):
         """Allow user to manually specify ffmpeg path."""
@@ -285,43 +524,27 @@ class DependencyPopup(tk.Toplevel):
             title="Select ffmpeg executable",
             filetypes=[("Executable", "ffmpeg*"), ("All files", "*")]
         )
-
         if not file_path:
             return
 
         ffmpeg_path = Path(file_path)
-
-        # Verify it's actually ffmpeg
         try:
-            result = subprocess.run([str(ffmpeg_path), '-version'],
-                                   capture_output=True, timeout=3)
+            result = subprocess.run([str(ffmpeg_path), '-version'], capture_output=True, timeout=3)
             if result.returncode == 0 and b'ffmpeg version' in result.stdout:
-                # Save to environment and config
                 ffmpeg_dir = str(ffmpeg_path.parent)
                 os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
-
                 config_file = get_app_config_dir() / "ffmpeg_path.conf"
                 config_file.write_text(ffmpeg_dir)
-
-                # Remove ffmpeg from missing
                 if "ffmpeg" in self.missing:
                     self.missing.remove("ffmpeg")
-
-                if not self.missing:
-                    self.status_label.config(text="FFmpeg configured successfully!")
-                    self.progress['value'] = 100
-                    self.after(1000, self.close_popup)
-                else:
-                    self.status_label.config(text="FFmpeg configured! Model will download on first use.")
-                    self.progress['value'] = 50
+                self._ffmpeg_resolved = True
+                self._check_both_done()
             else:
                 messagebox.showerror("Invalid File",
-                                   "Selected file is not ffmpeg or failed to execute.",
-                                   parent=self)
+                                     "Selected file is not ffmpeg or failed to execute.",
+                                     parent=self)
         except Exception as e:
-            messagebox.showerror("Error",
-                               f"Failed to verify ffmpeg: {e}",
-                               parent=self)
+            messagebox.showerror("Error", f"Failed to verify ffmpeg: {e}", parent=self)
 
     def specify_models_path(self):
         """Allow user to manually specify models directory."""
@@ -329,109 +552,36 @@ class DependencyPopup(tk.Toplevel):
             parent=self,
             title="Select models directory (should contain 'kokoro' folder)"
         )
-
         if not dir_path:
             return
 
         models_path = Path(dir_path)
         kokoro_path = models_path / "kokoro"
-
-        # Verify it contains kokoro models
         model_file = kokoro_path / "kokoro-v1.0.onnx"
         voices_file = kokoro_path / "voices-v1.0.bin"
 
         if model_file.exists() and voices_file.exists():
-            # Save to config
             config_file = get_app_config_dir() / "models_path.conf"
             config_file.write_text(str(models_path))
-
-            # Set environment variable for reader backend
             os.environ['AUDIOBOOK_READER_MODELS_DIR'] = str(models_path)
-
-            # Remove model from missing
             if "model" in self.missing:
                 self.missing.remove("model")
-
-            if not self.missing:
-                self.status_label.config(text="Models configured successfully!")
-                self.progress['value'] = 100
-                self.after(1000, self.close_popup)
-            else:
-                self.status_label.config(text="Models configured! FFmpeg still needed.")
-                self.progress['value'] = 50
+            self._model_resolved = True
+            self._check_both_done()
         else:
             messagebox.showerror("Invalid Directory",
-                               f"Directory must contain:\nkokoro/kokoro-v1.0.onnx\nkokoro/voices-v1.0.bin\n\nFound: {dir_path}",
-                               parent=self)
+                                 f"Directory must contain:\nkokoro/kokoro-v1.0.onnx\nkokoro/voices-v1.0.bin\n\nFound: {dir_path}",
+                                 parent=self)
 
-    def start_download(self):
-        self.download_btn.config(state="disabled")
-        threading.Thread(target=self._download_worker, daemon=True).start()
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    def _download_worker(self):
-        try:
-            if "ffmpeg" in self.missing and not shutil.which("ffmpeg"):
-                self._download_ffmpeg()
-                self.after(0, lambda: self.progress.config(value=50))
-
-            if "model" in self.missing:
-                self._download_model()
-                self.after(0, lambda: self.progress.config(value=100))
-
-            self.after(0, self.on_download_complete)
-        except Exception as e:
-            self.after(0, lambda: self.on_download_error(e))
-
-    def _download_ffmpeg(self):
-        self.after(0, lambda: self.status_label.config(text="Downloading FFmpeg..."))
-        import imageio_ffmpeg
-        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-        ffmpeg_dir = str(Path(ffmpeg_exe).parent)
-
-        # Add to current PATH
-        if ffmpeg_dir not in os.environ.get('PATH', ''):
-            os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
-
-        # Save for future sessions
-        config_file = get_app_config_dir() / "ffmpeg_path.conf"
-        config_file.write_text(ffmpeg_dir)
-
-    def _download_model(self):
-        self.after(0, lambda: self.status_label.config(text="Downloading Kokoro models (~310MB)..."))
-        from reader.utils.model_downloader import download_models
-
-        # Determine target directory based on user preference
-        target_dir = None
-        if self.permanent_models.get():
-            # Download to Application Support (permanent)
-            if getattr(sys, 'frozen', False):
-                # Bundled .app - use Application Support directory
-                target_dir = get_app_config_dir().parent / "models"
-            else:
-                # Development - use models/ in project root
-                target_dir = Path(__file__).parent.parent / "models"
-            target_dir.mkdir(parents=True, exist_ok=True)
-            self.after(0, lambda: self.status_label.config(text=f"Downloading to Application Support (~310MB)..."))
-
-        if not download_models(verbose=False, target_dir=target_dir):
-            raise RuntimeError("Model download failed")
-
-        # Set environment variable for reader backend
-        if target_dir:
-            os.environ['AUDIOBOOK_READER_MODELS_DIR'] = str(target_dir)
-            # Save to config for future sessions
-            config_file = get_app_config_dir() / "models_path.conf"
-            config_file.write_text(str(target_dir))
-
-    def on_download_complete(self):
-        self.status_label.config(text="All dependencies are installed!")
-        self.progress['value'] = 100
-        self.after(1000, self.close_popup)
-
-    def on_download_error(self, e):
-        messagebox.showerror("Download Failed", f"An error occurred: {e}\nPlease try the terminal command.", parent=self)
-        self.status_label.config(text="Download failed. Please use terminal command.")
-        self.download_btn.config(state="normal")
+    def center_window(self):
+        self.update_idletasks()
+        width = 720
+        height = 440
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f'{width}x{height}+{x}+{y}')
 
     def close_popup(self):
         self.download_complete.set()
@@ -439,9 +589,12 @@ class DependencyPopup(tk.Toplevel):
         self.parent.lift()
 
     def _on_close(self):
-        if messagebox.askyesno("Exit?", "The application cannot run without these dependencies. Exit?", parent=self):
+        if messagebox.askyesno("Exit?",
+                               "The application cannot run without these dependencies. Exit?",
+                               parent=self):
             self.parent.destroy()
             sys.exit(0)
+
 
 def run_dependency_check(parent):
     """Run check and show popup if needed. Returns True if dependencies are met."""
@@ -449,16 +602,14 @@ def run_dependency_check(parent):
 
     try:
         from reader_gui.startup_diagnostics import logger
-    except:
+    except Exception:
         logger = None
 
     try:
         if logger:
             logger.log("Augmenting PATH with common locations...")
-        # Augment PATH with common package manager locations
         augment_path_with_common_locations()
 
-        # Restore FFmpeg PATH from previous session
         ffmpeg_conf = get_app_config_dir() / "ffmpeg_path.conf"
         if ffmpeg_conf.exists():
             try:
@@ -472,7 +623,6 @@ def run_dependency_check(parent):
                     logger.log(f"Failed to restore FFmpeg PATH: {e}", "WARN")
                 print(f"Warning: Failed to restore FFmpeg PATH: {e}", file=sys.stderr)
 
-        # Restore models path from previous session
         models_conf = get_app_config_dir() / "models_path.conf"
         if models_conf.exists():
             try:
@@ -498,14 +648,12 @@ def run_dependency_check(parent):
         if logger:
             logger.log(f"Missing dependencies: {missing}", "WARN")
 
-        # Show dependency popup with error handling
         if logger:
             logger.log("Showing dependency popup...")
         try:
             popup = DependencyPopup(parent, missing)
             parent.wait_window(popup)
         except Exception as popup_error:
-            # If popup fails, show simple messagebox instead
             error_details = traceback.format_exc()
             if logger:
                 logger.log_exception(popup_error, "dependency popup")
@@ -524,7 +672,6 @@ def run_dependency_check(parent):
             )
             return result if result else False
 
-        # After popup, re-check
         if logger:
             logger.log("Re-checking dependencies after popup...")
         if not check_dependencies():
@@ -537,7 +684,6 @@ def run_dependency_check(parent):
             return False
 
     except Exception as e:
-        # Show error in messagebox
         error_details = traceback.format_exc()
         if logger:
             logger.log_exception(e, "run_dependency_check")
@@ -546,7 +692,7 @@ def run_dependency_check(parent):
         try:
             from reader_gui.startup_diagnostics import logger
             log_path = logger.get_log_path_display()
-        except:
+        except Exception:
             log_path = "See application logs directory"
 
         messagebox.showerror(
