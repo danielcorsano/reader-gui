@@ -279,9 +279,13 @@ class DependencyPopup(tk.Toplevel):
         ttk.Button(col, text="Specify Models", style='Dep.TButton',
                    command=self.specify_models_path).pack(pady=2)
 
-        self.model_perm_check = ttk.Checkbutton(col, text="Download permanently",
-                                                variable=self.permanent_models,
-                                                style='Dep.TCheckbutton')
+        if getattr(sys, 'frozen', False):
+            _perm_dir = str(get_app_config_dir().parent / "models")
+        else:
+            _perm_dir = str(Path(__file__).parent.parent / "models")
+        self.model_perm_check = ttk.Checkbutton(
+            col, text=f"Download permanently to '{_perm_dir}'",
+            variable=self.permanent_models, style='Dep.TCheckbutton')
         self.model_perm_check.pack(pady=(8, 2))
 
     # ── FFmpeg download ───────────────────────────────────────────────────────
@@ -433,8 +437,8 @@ class DependencyPopup(tk.Toplevel):
         win.transient(self)
         win.grab_set()
 
-        f = tk.Frame(win, bg="#000000", padx=20, pady=20)
-        f.pack()
+        f = ttk.Frame(win, style='Dep.TFrame', padding=20)
+        f.pack(fill=tk.BOTH, expand=True)
 
         system = platform.system()
         if system == "Darwin":
@@ -445,26 +449,18 @@ class DependencyPopup(tk.Toplevel):
             cmds = []
         url = "https://ffmpeg.org/download.html"
 
-        tk.Label(f, text="Install FFmpeg with one of these commands:", bg="#000000",
-                 fg="#FFD700", font=("Monaco", 12)).pack(anchor="w", pady=(0, 8))
+        ttk.Label(f, text="Install FFmpeg with one of these commands:",
+                  style='Dep.TLabel').pack(anchor="w", pady=(0, 8))
 
         for cmd in cmds:
-            row = tk.Frame(f, bg="#000000")
-            row.pack(anchor="w", pady=2)
-            tk.Label(row, text=cmd, bg="#111111", fg="#FFFFFF", font=("Monaco", 11),
-                     padx=8, pady=4).pack(side=tk.LEFT)
-            tk.Button(row, text="Copy", bg="#FFD700", fg="#000000", font=("Monaco", 10),
-                      relief="flat", padx=6,
-                      command=lambda c=cmd: self._copy(c)).pack(side=tk.LEFT, padx=(6, 0))
+            self._cmd_row(f, cmd)
 
-        tk.Label(f, text=f"Or download from: {url}", bg="#000000",
-                 fg="#888888", font=("Monaco", 10)).pack(anchor="w", pady=(10, 0))
-        tk.Button(f, text="Open in Browser", bg="#FFD700", fg="#000000", font=("Monaco", 11),
-                  relief="flat", padx=8, pady=4,
-                  command=lambda: webbrowser.open(url)).pack(anchor="w", pady=6)
-        tk.Button(f, text="Close", bg="#333333", fg="#FFD700", font=("Monaco", 11),
-                  relief="flat", padx=8, pady=4,
-                  command=win.destroy).pack(anchor="e", pady=(6, 0))
+        ttk.Label(f, text=f"Or download from: {url}",
+                  style='Dep.TLabel').pack(anchor="w", pady=(10, 0))
+        ttk.Button(f, text="Open in Browser", style='Dep.TButton',
+                   command=lambda: webbrowser.open(url)).pack(anchor="w", pady=6)
+        ttk.Button(f, text="Close", style='Dep.TButton',
+                   command=win.destroy).pack(anchor="e", pady=(6, 0))
 
     def _show_models_manual(self):
         win = tk.Toplevel(self)
@@ -473,40 +469,47 @@ class DependencyPopup(tk.Toplevel):
         win.transient(self)
         win.grab_set()
 
-        f = tk.Frame(win, bg="#000000", padx=20, pady=20)
-        f.pack()
+        f = ttk.Frame(win, style='Dep.TFrame', padding=20)
+        f.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(f, text="Install models via CLI:", bg="#000000",
-                 fg="#FFD700", font=("Monaco", 12)).pack(anchor="w", pady=(0, 8))
+        system = platform.system()
+        if system == "Darwin":
+            models_dir = "~/Library/Caches/audiobook-reader/models/kokoro"
+        elif system == "Windows":
+            models_dir = "%LOCALAPPDATA%\\audiobook-reader\\models\\kokoro"
+        else:
+            models_dir = "~/.cache/audiobook-reader/models/kokoro"
 
-        for cmd in ["reader download models",
-                    "pip install audiobook-reader && reader download models"]:
-            row = tk.Frame(f, bg="#000000")
-            row.pack(anchor="w", pady=2)
-            tk.Label(row, text=cmd, bg="#111111", fg="#FFFFFF", font=("Monaco", 11),
-                     padx=8, pady=4).pack(side=tk.LEFT)
-            tk.Button(row, text="Copy", bg="#FFD700", fg="#000000", font=("Monaco", 10),
-                      relief="flat", padx=6,
-                      command=lambda c=cmd: self._copy(c)).pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Label(f, text="1. Create the models folder:",
+                  style='Dep.TLabel').pack(anchor="w", pady=(0, 4))
+        if system == "Windows":
+            self._cmd_row(f, f'mkdir "{models_dir}"')
+        else:
+            self._cmd_row(f, f"mkdir -p {models_dir}")
 
-        tk.Label(f, text="Or download files directly:", bg="#000000",
-                 fg="#888888", font=("Monaco", 10)).pack(anchor="w", pady=(12, 4))
-
+        ttk.Label(f, text="2. Download the model files:",
+                  style='Dep.TLabel').pack(anchor="w", pady=(10, 4))
         for name in MODEL_FILES:
             url = f"{MODEL_BASE_URL}/{name}"
-            row = tk.Frame(f, bg="#000000")
-            row.pack(anchor="w", pady=1)
-            tk.Label(row, text=url, bg="#111111", fg="#AAAAAA", font=("Monaco", 9),
-                     padx=6, pady=2).pack(side=tk.LEFT)
-            tk.Button(row, text="Copy", bg="#FFD700", fg="#000000", font=("Monaco", 9),
-                      relief="flat", padx=4,
-                      command=lambda u=url: self._copy(u)).pack(side=tk.LEFT, padx=(4, 0))
+            if system == "Windows":
+                cmd = f'curl -L -o "{models_dir}\\{name}" "{url}"'
+            else:
+                cmd = f"curl -L -o {models_dir}/{name} \\\n  {url}"
+            self._cmd_row(f, cmd)
 
-        tk.Label(f, text="Place files in: <models_dir>/kokoro/", bg="#000000",
-                 fg="#888888", font=("Monaco", 10)).pack(anchor="w", pady=(8, 0))
-        tk.Button(f, text="Close", bg="#333333", fg="#FFD700", font=("Monaco", 11),
-                  relief="flat", padx=8, pady=4,
-                  command=win.destroy).pack(anchor="e", pady=(12, 0))
+        ttk.Label(f, text="3. Use \"Specify Models\" to point the app to the folder.",
+                  style='Dep.TLabel').pack(anchor="w", pady=(10, 0))
+        ttk.Button(f, text="Close", style='Dep.TButton',
+                   command=win.destroy).pack(anchor="e", pady=(12, 0))
+
+    def _cmd_row(self, parent, cmd):
+        """Row with a monospace command label and a Copy button."""
+        row = ttk.Frame(parent, style='Dep.TFrame')
+        row.pack(anchor="w", pady=2)
+        tk.Label(row, text=cmd, bg="#111111", fg="#FFFFFF", font=("Monaco", 11),
+                 padx=8, pady=4, justify="left").pack(side=tk.LEFT)
+        ttk.Button(row, text="Copy", style='Dep.TButton',
+                   command=lambda c=cmd: self._copy(c)).pack(side=tk.LEFT, padx=(6, 0))
 
     def _copy(self, text):
         self.clipboard_clear()
