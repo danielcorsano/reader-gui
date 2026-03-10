@@ -473,29 +473,23 @@ class DependencyPopup(tk.Toplevel):
         f.pack(fill=tk.BOTH, expand=True)
 
         system = platform.system()
-        if system == "Darwin":
-            models_dir = "~/Library/Caches/audiobook-reader/models/kokoro"
-        elif system == "Windows":
-            models_dir = "%LOCALAPPDATA%\\audiobook-reader\\models\\kokoro"
+        if getattr(sys, 'frozen', False):
+            _perm_base = get_app_config_dir().parent / "models"
         else:
-            models_dir = "~/.cache/audiobook-reader/models/kokoro"
+            _perm_base = Path(__file__).parent.parent / "models"
+        models_dir = str(_perm_base / "kokoro")
 
         ttk.Label(f, text="1. Create the models folder:",
                   style='Dep.TLabel').pack(anchor="w", pady=(0, 4))
-        if system == "Windows":
-            self._cmd_row(f, f'mkdir "{models_dir}"')
-        else:
-            self._cmd_row(f, f"mkdir -p {models_dir}")
+        self._cmd_row(f, f'mkdir -p "{models_dir}"' if system != "Windows"
+                      else f'mkdir "{models_dir}"')
 
-        ttk.Label(f, text="2. Download the model files:",
+        ttk.Label(f, text="2. Download the model files into that folder:",
                   style='Dep.TLabel').pack(anchor="w", pady=(10, 4))
         for name in MODEL_FILES:
             url = f"{MODEL_BASE_URL}/{name}"
-            if system == "Windows":
-                cmd = f'curl -L -o "{models_dir}\\{name}" "{url}"'
-            else:
-                cmd = f"curl -L -o {models_dir}/{name} \\\n  {url}"
-            self._cmd_row(f, cmd)
+            dest = f'"{models_dir}/{name}"' if system != "Windows" else f'"{models_dir}\\{name}"'
+            self._cmd_row(f, f'curl -L -o {dest} "{url}"')
 
         ttk.Label(f, text="3. Use \"Specify Models\" to point the app to the folder.",
                   style='Dep.TLabel').pack(anchor="w", pady=(10, 0))
