@@ -279,10 +279,7 @@ class DependencyPopup(tk.Toplevel):
         ttk.Button(col, text="Specify Models", style='Dep.TButton',
                    command=self.specify_models_path).pack(pady=2)
 
-        if getattr(sys, 'frozen', False):
-            _perm_dir = str(get_app_config_dir().parent / "models")
-        else:
-            _perm_dir = str(Path(__file__).parent.parent / "models")
+        _perm_dir = get_app_config_dir() / "models"
         self.model_perm_check = ttk.Checkbutton(
             col, text=f"Download permanently to '{_perm_dir}'",
             variable=self.permanent_models, style='Dep.TCheckbutton')
@@ -345,10 +342,7 @@ class DependencyPopup(tk.Toplevel):
         try:
             target_dir = None
             if self.permanent_models.get():
-                if getattr(sys, 'frozen', False):
-                    target_dir = get_app_config_dir().parent / "models"
-                else:
-                    target_dir = Path(__file__).parent.parent / "models"
+                target_dir = get_app_config_dir() / "models"
                 target_dir.mkdir(parents=True, exist_ok=True)
 
             cache = (target_dir or self._default_cache()) / "kokoro"
@@ -473,11 +467,7 @@ class DependencyPopup(tk.Toplevel):
         f.pack(fill=tk.BOTH, expand=True)
 
         system = platform.system()
-        if getattr(sys, 'frozen', False):
-            _perm_base = get_app_config_dir().parent / "models"
-        else:
-            _perm_base = Path(__file__).parent.parent / "models"
-        models_dir = str(_perm_base / "kokoro")
+        models_dir = str(get_app_config_dir() / "models" / "kokoro")
 
         ttk.Label(f, text="1. Create the models folder:",
                   style='Dep.TLabel').pack(anchor="w", pady=(0, 4))
