@@ -279,9 +279,8 @@ class DependencyPopup(tk.Toplevel):
         ttk.Button(col, text="Specify Models", style='Dep.TButton',
                    command=self.specify_models_path).pack(pady=2)
 
-        _perm_dir = get_app_config_dir() / "models"
         self.model_perm_check = ttk.Checkbutton(
-            col, text=f"Download permanently to '{_perm_dir}'",
+            col, text="Save permanently",
             variable=self.permanent_models, style='Dep.TCheckbutton')
         self.model_perm_check.pack(pady=(8, 2))
 
