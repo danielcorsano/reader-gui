@@ -16,9 +16,13 @@ import webbrowser
 
 from reader_gui.app_dirs import get_app_config_dir
 
-MODEL_BASE_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
-MODEL_FILES = ["kokoro-v1.0.onnx", "voices-v1.0.bin"]
-
+try:
+    from reader.engines.kokoro_engine import KOKORO_MODEL_URL, KOKORO_MODEL_FILE, KOKORO_VOICES_FILE
+    MODEL_BASE_URL = KOKORO_MODEL_URL
+    MODEL_FILES = [KOKORO_MODEL_FILE, KOKORO_VOICES_FILE]
+except ImportError:
+    MODEL_BASE_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+    MODEL_FILES = ["kokoro-v1.0.onnx", "voices-v1.0.bin"]
 
 def augment_path_with_common_locations():
     """Add common package manager locations to PATH for .app environment."""
@@ -135,8 +139,8 @@ def check_dependencies():
 
     model_found = False
     for location in get_model_locations():
-        model = location / "kokoro-v1.0.onnx"
-        voices = location / "voices-v1.0.bin"
+        model = location / MODEL_FILES[0]
+        voices = location / MODEL_FILES[1]
         if model.exists() and voices.exists():
             model_found = True
             break
@@ -543,8 +547,8 @@ class DependencyPopup(tk.Toplevel):
 
         models_path = Path(dir_path)
         kokoro_path = models_path / "kokoro"
-        model_file = kokoro_path / "kokoro-v1.0.onnx"
-        voices_file = kokoro_path / "voices-v1.0.bin"
+        model_file = kokoro_path / MODEL_FILES[0]
+        voices_file = kokoro_path / MODEL_FILES[1]
 
         if model_file.exists() and voices_file.exists():
             config_file = get_app_config_dir() / "models_path.conf"
@@ -556,8 +560,8 @@ class DependencyPopup(tk.Toplevel):
             self._check_both_done()
         else:
             messagebox.showerror("Invalid Directory",
-                                 f"Directory must contain:\nkokoro/kokoro-v1.0.onnx\nkokoro/voices-v1.0.bin\n\nFound: {dir_path}",
-                                 parent=self)
+                               f"Directory must contain:\nkokoro/{MODEL_FILES[0]}\nkokoro/{MODEL_FILES[1]}\n\nFound: {dir_path}",
+                               parent=self)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
