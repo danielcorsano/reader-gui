@@ -1,4 +1,4 @@
-# Audiobook Reader v0.4.0
+# Audiobook Reader v0.4.1
 
 See [CHANGELOG](https://github.com/danielcorsano/reader-gui/blob/main/CHANGELOG.md) for version history.
 
@@ -10,7 +10,7 @@ See [CHANGELOG](https://github.com/danielcorsano/reader-gui/blob/main/CHANGELOG.
 - **Linux**: `AudiobookReader-linux.tar.gz` - Extract and run
 
 ## Features
-- 54 AI Voices: Kokoro-82M TTS (9 languages)
+- **54 AI Voices in 9 Languages**: **American English** (20 voices), **British English** (8), **Japanese** (5), **Mandarin Chinese** (8), **Spanish** (3), **French** (1), **Hindi** (4), **Italian** (2), **Brazilian Portuguese** (3)
 - Multiple Formats: EPUB, PDF, TXT, Markdown, RST → MP3/WAV/M4A/M4B. For other formats see the [ConverText app](https://github.com/danielcorsano/convertext-gui/releases) or the [CLI version on PyPI](https://pypi.org/project/convertext/).
 - Character Voices (beta): Assign different voices to characters
 - Real-time Progress: Speed charts, ETA, conversion metrics

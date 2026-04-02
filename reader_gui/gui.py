@@ -131,7 +131,7 @@ class AudiobookReaderGUI(ttk.Window):
         self.output_dir = tk.StringVar(value=str(Path.home() / "Downloads"))
         self.language_filter = tk.StringVar(value="All")
         self.voice = tk.StringVar(value="am_michael")
-        self.speed = tk.DoubleVar(value=1.1)
+        self.speed = tk.DoubleVar(value=1.0)
         self.speed.trace_add("write", lambda *args: self.update_speed_label())
         self.output_format = tk.StringVar(value="mp3")
         self.character_voices_enabled = tk.BooleanVar(value=False)
