@@ -35,7 +35,7 @@ The app checks for required dependencies on startup:
 ## Usage
 
 1. Click **Browse** to select EPUB, PDF, or text file
-2. Choose voice (default: am_michael)
+2. Choose voice (default: bm_fable)
 3. Adjust speed (0.5x - 2.0x)
 4. Select output format (MP3/WAV/M4A/M4B)
 5. Optional: Enable **Character Voices** for dialogue
@@ -51,7 +51,7 @@ characters:
   - name: Alice
     voice: af_sarah
   - name: Bob
-    voice: am_michael
+    voice: bm_fable
 ```
 
 The app auto-detects this file, or browse to it manually.

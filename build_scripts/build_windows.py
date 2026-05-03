@@ -70,6 +70,7 @@ def build_windows():
         "--hidden-import=reader.text_processing.text_cleaner",
         "--hidden-import=reader.text_processing.heading_detector",
         "--hidden-import=reader.text_processing.number_expander",
+        "--hidden-import=reader.text_processing.phonemizer",
         "--hidden-import=reader.voices",
         "--hidden-import=reader.voices.character_mapper",
         "--hidden-import=reader.voices.voice_previewer",

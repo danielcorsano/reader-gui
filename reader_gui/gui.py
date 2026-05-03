@@ -130,7 +130,7 @@ class AudiobookReaderGUI(ttk.Window):
         self.file_path = tk.StringVar()
         self.output_dir = tk.StringVar(value=str(Path.home() / "Downloads"))
         self.language_filter = tk.StringVar(value="All")
-        self.voice = tk.StringVar(value="am_michael")
+        self.voice = tk.StringVar(value="bm_fable")
         self.speed = tk.DoubleVar(value=1.0)
         self.speed.trace_add("write", lambda *args: self.update_speed_label())
         self.output_format = tk.StringVar(value="mp3")
@@ -394,7 +394,7 @@ class AudiobookReaderGUI(ttk.Window):
 
             return result
         except Exception:
-            return ["am_michael (male, en-us)"]
+            return ["bm_fable (male, en-gb)"]
 
     def _get_language_list(self):
         """Get list of available languages."""
@@ -464,7 +464,7 @@ class AudiobookReaderGUI(ttk.Window):
 
             return result
         except Exception:
-            return ["am_michael (male, en-us)"]
+            return ["bm_fable (male, en-gb)"]
 
     def _on_language_change(self, event=None):
         """Update voice dropdown when language filter changes."""
@@ -479,7 +479,7 @@ class AudiobookReaderGUI(ttk.Window):
     def preview_voice(self):
         """Generate and play preview for selected voice."""
         voice_selection = self.voice.get()
-        voice_id = voice_selection.split()[0] if voice_selection else "am_michael"
+        voice_id = voice_selection.split()[0] if voice_selection else "bm_fable"
 
         try:
             from reader.voices.voice_previewer import get_voice_previewer
@@ -592,7 +592,7 @@ class AudiobookReaderGUI(ttk.Window):
 
         # Extract voice ID from dropdown selection
         voice_selection = self.voice.get()
-        voice_id = voice_selection.split()[0] if voice_selection else "am_michael"
+        voice_id = voice_selection.split()[0] if voice_selection else "bm_fable"
 
         # Save last directory
         self._save_last_directory()
