@@ -236,6 +236,8 @@ class AudiobookReaderGUI(ttk.Window):
         )
         speed_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
 
+        self.update_speed_label()
+
         # Format and visualization
         options_frame = ttk.Frame(main_container)
         options_frame.pack(fill=tk.X, padx=21, pady=5)
@@ -370,10 +372,18 @@ class AudiobookReaderGUI(ttk.Window):
         self.convert_btn.pack()
 
 
+    def _get_voices_dict(self):
+        """Return voice metadata without instantiating the TTS engine (no models/ffmpeg required)."""
+        try:
+            from reader.engines.kokoro_engine import KokoroEngine
+            return KokoroEngine.VOICES
+        except Exception:
+            return self.reader.list_voices()
+
     def _get_voice_list(self):
         """Get available voices grouped by language and sorted alphabetically."""
         try:
-            voices = self.reader.list_voices()
+            voices = self._get_voices_dict()
 
             # Group voices by language
             by_language = defaultdict(list)
@@ -411,7 +421,7 @@ class AudiobookReaderGUI(ttk.Window):
         }
 
         try:
-            voices = self.reader.list_voices()
+            voices = self._get_voices_dict()
             languages = set()
             for info in voices.values():
                 lang = info.get('lang', 'unknown')
@@ -440,7 +450,7 @@ class AudiobookReaderGUI(ttk.Window):
         }
 
         try:
-            voices = self.reader.list_voices()
+            voices = self._get_voices_dict()
             by_language = defaultdict(list)
 
             target_lang = lang_map_reverse.get(language_filter)
