@@ -1,4 +1,4 @@
-# Audiobook Reader v0.4.1
+# Audiobook Reader v0.4.2
 
 See [CHANGELOG](https://github.com/danielcorsano/reader-gui/blob/main/CHANGELOG.md) for version history.
 
