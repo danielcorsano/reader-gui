@@ -131,6 +131,13 @@ def run_startup_diagnostics():
                     issues.append(f"Reader.list_voices() failed: {e}")
                     logger.log_exception(e, "Reader.list_voices()")
 
+                try:
+                    from reader.text_processing.phonemizer import get_phonemizer
+                    g2p_available = get_phonemizer().is_available('en-gb')
+                    logger.log(f"{'✓' if g2p_available else 'ℹ'} G2P (misaki) available: {g2p_available}")
+                except Exception as e:
+                    logger.log(f"ℹ G2P (misaki) not available: {e}")
+
             except Exception as e:
                 issues.append(f"Reader instantiation failed: {e}")
                 logger.log_exception(e, "Reader()")

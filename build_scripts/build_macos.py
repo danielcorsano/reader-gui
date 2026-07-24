@@ -72,6 +72,14 @@ def build_macos():
         "--hidden-import=reader.text_processing.heading_detector",
         "--hidden-import=reader.text_processing.number_expander",
         "--hidden-import=reader.text_processing.phonemizer",
+        "--hidden-import=misaki",
+        "--hidden-import=misaki.en",
+        "--hidden-import=misaki.ja",
+        "--hidden-import=misaki.zh",
+        "--hidden-import=num2words",
+        "--hidden-import=spacy",
+        "--hidden-import=spacy.lang.en",
+        "--hidden-import=en_core_web_sm",
         "--hidden-import=reader.voices",
         "--hidden-import=reader.voices.character_mapper",
         "--hidden-import=reader.voices.voice_previewer",
@@ -112,6 +120,11 @@ def build_macos():
         "--collect-all=language_tags",  # Fix for missing JSON data files
         "--collect-all=babel",  # Locale data
         "--collect-all=ebooklib",  # EPUB data
+        "--collect-all=misaki",
+        "--collect-all=spacy",  # Language pipeline data
+        "--collect-all=en_core_web_sm",  # spaCy English model weights/config
+        "--collect-all=thinc",  # spaCy's ML backend uses a dynamic registry
+        "--collect-all=num2words",
         "--noconfirm",
         "--clean",
     ]

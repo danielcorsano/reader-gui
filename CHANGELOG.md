@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.3 (2026-07-24)
+
+### New Features
+- Improved pronunciation via G2P phonemization (numbers, abbreviations, homographs)
+
 ## v0.3.1 (2025-11-18)
 
 ### Bug Fixes
