@@ -4,38 +4,49 @@ import importlib
 import io
 import sys
 
+import pytest
 
-def test_utf8_header_and_append_with_cp1252_defaults(tmp_path, monkeypatch):
+MESSAGE = '✓ tkinter import OK — 東京 café Мария العربية'
+
+
+@pytest.fixture
+def cp1252_diagnostics(tmp_path, monkeypatch):
+    """Fresh startup_diagnostics logging to a Unicode tmp dir, with cp1252 as the default file encoding."""
     from reader_gui import app_dirs
     log_dir = tmp_path / "Logs 日本語 café"
     log_dir.mkdir()
-    monkeypatch.setattr(app_dirs, "get_app_log_dir", lambda: log_dir)
-    monkeypatch.chdir(log_dir)
     original_open = builtins.open
     def ansi_open(file, mode='r', *args, **kwargs):
         if 'b' not in mode and not args and 'encoding' not in kwargs:
             kwargs['encoding'] = 'cp1252'
         return original_open(file, mode, *args, **kwargs)
     monkeypatch.setattr(builtins, "open", ansi_open)
-    # The module initializes its global logger during import.
+    monkeypatch.setattr(app_dirs, "get_app_log_dir", lambda: log_dir)
+    monkeypatch.chdir(log_dir)
     sys.modules.pop('reader_gui.startup_diagnostics', None)
-    diagnostics = importlib.import_module('reader_gui.startup_diagnostics')
+    yield importlib.import_module('reader_gui.startup_diagnostics')
+    sys.modules.pop('reader_gui.startup_diagnostics', None)
+
+
+def test_unicode_log_with_cp1252_stderr(cp1252_diagnostics, monkeypatch):
     encoded = io.BytesIO()
-    stderr = io.TextIOWrapper(encoded, encoding='cp1252', errors='strict')
+    stderr = io.TextIOWrapper(encoded, encoding='cp1252', errors='backslashreplace')
     monkeypatch.setattr(sys, 'stderr', stderr)
-    message = '✓ tkinter import OK — 東京 café Мария العربية'
-    diagnostics.logger.log(message)
+    cp1252_diagnostics.logger.log(MESSAGE)
     stderr.flush()
-    content = diagnostics.logger.log_file.read_text(encoding='utf-8')
-    assert str(log_dir) in content
-    assert message in content
-    assert message in encoded.getvalue().decode('utf-8')
+    content = cp1252_diagnostics.logger.log_file.read_text(encoding='utf-8')
+    assert str(cp1252_diagnostics.logger.log_file.parent) in content
+    assert MESSAGE in content
+    assert 'tkinter import OK' in encoded.getvalue().decode('cp1252')
+    assert (stderr.encoding, stderr.errors) == ('cp1252', 'backslashreplace')
 
 
-def test_windowed_executable_without_stderr(tmp_path, monkeypatch):
-    from reader_gui import startup_diagnostics
-    monkeypatch.setattr(startup_diagnostics, 'get_app_log_dir', lambda: tmp_path)
+def test_windowed_executable_without_stderr(cp1252_diagnostics, monkeypatch):
+    encoded = io.BytesIO()
+    stdout = io.TextIOWrapper(encoded, encoding='cp1252', errors='strict')
     monkeypatch.setattr(sys, 'stderr', None)
-    logger = startup_diagnostics.StartupLogger()
-    logger.log('✓ Unicode works without a console: 日本語')
-    assert '✓ Unicode works without a console: 日本語' in logger.log_file.read_text(encoding='utf-8')
+    monkeypatch.setattr(sys, 'stdout', stdout)
+    cp1252_diagnostics.logger.log(MESSAGE)
+    stdout.flush()
+    assert MESSAGE in cp1252_diagnostics.logger.log_file.read_text(encoding='utf-8')
+    assert encoded.getvalue() == b''
