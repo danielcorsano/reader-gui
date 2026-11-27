@@ -47,8 +47,6 @@ class StartupLogger:
 
         # Also print to stderr for terminal debugging
         if sys.stderr is not None:
-            if hasattr(sys.stderr, 'reconfigure'):
-                sys.stderr.reconfigure(encoding='utf-8')
             print(log_line.rstrip(), file=sys.stderr)
 
         if level == "ERROR":
