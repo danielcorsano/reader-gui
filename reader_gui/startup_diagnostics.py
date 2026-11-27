@@ -24,7 +24,7 @@ class StartupLogger:
 
     def _write_header(self):
         """Write session header."""
-        with open(self.log_file, 'w') as f:
+        with open(self.log_file, 'w', encoding='utf-8') as f:
             f.write(f"=== Audiobook Reader GUI Startup Log ===\n")
             f.write(f"Session: {datetime.now()}\n")
             f.write(f"Platform: {platform.system()} {platform.release()}\n")
@@ -42,11 +42,14 @@ class StartupLogger:
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         log_line = f"[{timestamp}] [{level}] {message}\n"
 
-        with open(self.log_file, 'a') as f:
+        with open(self.log_file, 'a', encoding='utf-8') as f:
             f.write(log_line)
 
         # Also print to stderr for terminal debugging
-        print(f"{log_line.rstrip()}", file=sys.stderr)
+        if sys.stderr is not None:
+            if hasattr(sys.stderr, 'reconfigure'):
+                sys.stderr.reconfigure(encoding='utf-8')
+            print(log_line.rstrip(), file=sys.stderr)
 
         if level == "ERROR":
             self.errors.append(message)
@@ -249,7 +252,7 @@ def show_diagnostic_error(parent=None):
 
     # Load and display log
     try:
-        with open(logger.log_file, 'r') as f:
+        with open(logger.log_file, 'r', encoding='utf-8') as f:
             log_content = f.read()
         log_text.insert("1.0", log_content)
     except Exception as e:

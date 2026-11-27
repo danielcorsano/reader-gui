@@ -1064,7 +1064,7 @@ def main():
                 error_text.insert(tk.END, error_msg)
                 error_text.insert(tk.END, "\n\n=== FULL STARTUP LOG ===\n\n")
                 try:
-                    with open(logger.log_file, 'r') as f:
+                    with open(logger.log_file, 'r', encoding='utf-8') as f:
                         error_text.insert(tk.END, f.read())
                 except:
                     error_text.insert(tk.END, "[Could not read log file]")
